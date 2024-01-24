@@ -4,7 +4,6 @@ from shapely.geometry import Point
 import xml.etree.ElementTree as ET
 import kml2geojson
 import json
-import os
 
 def parse_kml_coordinates(kml_file):
     tree = ET.parse(kml_file)
@@ -29,39 +28,28 @@ def kml_to_geojson(kml_file):
 def kml_to_geodataframe(kml_file):
     coordinates = parse_kml_coordinates(kml_file)
     gdf = gpd.GeoDataFrame(geometry=coordinates)
-    
-    # Crear la columna 'lat' a partir de la segunda componente en las coordenadas
-    gdf['lat'] = gdf['geometry'].apply(lambda point: point.y)
-    
-    # Eliminar la columna 'geometry' ya que 'lat' contiene la información necesaria
-    gdf = gdf.drop('geometry', axis=1)
-    
     return gdf
 
 def main():
     st.title("Visualizador de Coordenadas KML")
 
-    # Especificar la ruta del archivo KML directamente
-    kml_file_path = "Indicaciones de C del Clariano, 11 a C dels Sants Just i Pastor, 153.kml"
+    # Archivo KML
+    kml_file = st.file_uploader("Cargar archivo KML", type=["kml"])
 
-    # Transformar a GeoJSON
-    geojson_data = kml_to_geojson(kml_file_path)
-    
-    # Crear GeoDataFrame
-    gdf = kml_to_geodataframe(kml_file_path)
+    if kml_file is not None:
+        st.subheader("Mapa de Coordenadas")
 
-    # Crear un directorio temporal para almacenar el archivo GeoJSON
-    temp_dir = os.path.join(os.path.dirname(__file__), "temp")  # Puedes cambiar "temp" a cualquier nombre de directorio que desees
-    os.makedirs(temp_dir, exist_ok=True)
+        # Transformar a GeoJSON
+        geojson_data = kml_to_geojson(kml_file)
+        
+        # Crear GeoDataFrame
+        gdf = kml_to_geodataframe(kml_file)
 
-    # Guardar el GeoDataFrame en formato GeoJSON temporal
-    temp_geojson_path = os.path.join(temp_dir, "temp.geojson")
-    gdf.to_file(temp_geojson_path, driver="GeoJSON")
+        gdf['latitude'] = gdf['geometry'].y
+        gdf['longitude'] = gdf['geometry'].x
 
-    # Mostrar el mapa especificando las columnas de latitud y longitud
-    st.map(data=gdf, lat_column='lat', lon_column='longitude')
+        # Mostrar el mapa especificando las columnas de latitud y longitud
+        st.map(data=gdf, lat_column='latitude', lon_column='longitude')
 
 if __name__ == "__main__":
     main()
-
-
