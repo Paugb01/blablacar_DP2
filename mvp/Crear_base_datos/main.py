@@ -3,7 +3,7 @@ import psycopg2
 
 # 1- Conectar a la base de datos PostgreSQL
 conn = psycopg2.connect(
-    host="postgres", #SI ES PARA EL DOCKER-COMPOSE, CAMBIAR POR "postgres", en local igual a "localhost"
+    host="localhost", #SI ES PARA EL DOCKER-COMPOSE, CAMBIAR POR "postgres", en local igual a "localhost"
     database="postgres",
     user="postgres",
     password="postgres",
