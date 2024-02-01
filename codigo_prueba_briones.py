@@ -24,7 +24,7 @@ import time
 
 
 project_id = 'data-project2-413008'
-topic_name = 'data-project2'
+topic_name = 'DATA-PROJECT2'
 i_coord = (-0.35236,39.47492)
 f_coord = (-0.37517,39.45145)
 
