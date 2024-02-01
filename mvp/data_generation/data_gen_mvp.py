@@ -124,7 +124,7 @@ if __name__ == "__main__":
         passenger_list = []
         for passenger in range(n_passengers):
             passenger_list.append(create_passenger())
-            passenger_list[passenger]['location'] = course_points(kml_file)[0]
+            passenger_list[passenger]['location'] = course_points(kml_file)[75]
 
         # Parse each list and convert them into JSONS
         # Drivers
