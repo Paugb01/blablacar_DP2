@@ -5,3 +5,8 @@
 -   23/01/2024:
     -   jumepe [ADDED] data_gen_mvp.py:
         -   Python script containing functions to parse course data from KML file to a dataframe, generate drivers, passengers and pass a course to a driver.
+    -
+-    01/02/2024:
+-       dipifa [ADDED]
+-       GCP, creación de un PUB/SUB que lee los datos de un generador, utiliza DATAFLOW y se pueden hacer
+-       consulstas en BIG QUERY       
