@@ -1,6 +1,6 @@
 #puede que tengamos que hacer algo con el nombre del generador, especificar las coordenadas cuando son del driver( location_driver) 
 #y cuando son del pasajero (passenger_location?)
-
+'''
 def split_and_verify_location(car_location, passenger_location):
     
     car_latitud, car_longitud = car_location
@@ -20,6 +20,31 @@ passenger_location = (1, -3)  # Ejemplo de coordenadas del pasajero
 if split_and_verify_location(car_location, passenger_location):
     print("mismas coordenadas, se sube al coche")
 
+'''
+
+#con esta funcion tenemos mas rango para que se suba el pasajero, la anterior es con el punto exacto entre coordenadas
+import math
+
+def calculate_euclidean_distance(lat1, lon1, lat2, lon2):
+    return math.sqrt((lat2 - lat1)**2 + (lon2 - lon1)**2)
+
+def split_and_verify_location(car_location, passenger_location, distance_threshold=0.1): #distancia max entre coordenadas para que se suba
+    car_latitud, car_longitud = car_location
+    passenger_latitud, passenger_longitud = passenger_location
+
+    # Calcular la distancia euclidiana entre las coordenadas
+    distance = calculate_euclidean_distance(car_latitud, car_longitud, passenger_latitud, passenger_longitud)
+
+    # Verificar si la distancia es menor o igual al umbral
+    encounter_verified = distance <= distance_threshold
+
+    return encounter_verified
+
+car_location = (1, -3)  # Ejemplo de coordenadas del coche
+passenger_location = (1.0009, -3)  # Ejemplo de coordenadas del pasajero
+
+if split_and_verify_location(car_location, passenger_location):
+    print("Mismas coordenadas o cercanas, se sube al coche")
 
 
 
