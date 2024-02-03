@@ -45,6 +45,7 @@ def split_location(message):
     return message
     
 
+
 def run():
     with beam.Pipeline(options=PipelineOptions(streaming=True, save_main_session=True)) as p:
         (
@@ -53,13 +54,12 @@ def run():
             | "decode msg" >> beam.Map(decode_message)
             | "Transform Course" >> beam.Map(transform_course_to_string)
             | "Split Location" >> beam.Map(split_location)
-            | "Print Message" >> beam.Map(print)
-            # | "Write to BigQuery" >>  beam.io.WriteToBigQuery(
-            #     table=f"{project_id}:{bq_dataset}.{bq_table}",
-            #     schema='plate_id:STRING,course:STRING,seats:INTEGER,passengers:INTEGER,trip_cost:FLOAT,full_tariff:FLOAT,location_latitud:FLOAT,location_longitud:FLOAT',
-            #     create_disposition=beam.io.BigQueryDisposition.CREATE_NEVER,
-            #     write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
-            # )
+            | "Write to BigQuery" >>  beam.io.WriteToBigQuery(
+                table=f"{project_id}:{bq_dataset}.{bq_table}",
+                schema='plate_id:STRING,course:STRING,seats:INTEGER,passengers:INTEGER,trip_cost:FLOAT,full_tariff:FLOAT,location_latitud:FLOAT,location_longitud:FLOAT',
+                create_disposition=beam.io.BigQueryDisposition.CREATE_NEVER,
+                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
+            )
         )
 
 if __name__ == '__main__':
