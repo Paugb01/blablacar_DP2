@@ -64,16 +64,13 @@ def gen_passenger(n_passengers, kml_file):
         passenger_list.append(create_passenger())
         passenger_list[passenger]['location'] = random.choice(course_points(kml_file))
 
-    # Parse each list and convert them into JSONS
     # Passengers
-    passenger_json_list = [json.dumps(item) for item in passenger_list]
 
     try:
         # Use PubSubMessages as a context manager
+        pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
         # Publish passenger messages
-        for passenger_json in passenger_json_list:
-            passenger = json.loads(passenger_json)
-            pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
+        for passenger in passenger_list:
             print("Publishing passenger message:", passenger['passenger_id']) # For debugging
             pubsub_class.publish_messages_passenger(passenger)
             print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging

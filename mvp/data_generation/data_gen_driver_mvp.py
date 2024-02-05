@@ -65,22 +65,18 @@ def gen_drivers(n_drivers, kml_file):
     for driver in range(n_drivers):
         drivers_list.append(create_driver(kml_file))
 
-    # Parse each list and convert them into JSONS
-    # Drivers
-    driver_json_list = [json.dumps(item) for item in drivers_list]
+    # Driver
 
     try:
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name)
-        for driver_json in driver_json_list:
-            driver = json.loads(driver_json)
+        for driver in drivers_list:
             for i in range(len(driver['course'])):
                 driver['location'] = driver['course'][i]
                 print(driver['location'])
                 # Publish driver messages
                 print("Publishing driver message:", driver['plate_id']) # For debugging
                 pubsub_class.publish_messages_driver(driver)
-                #pubsub_class
                 print("Driver message published:", driver['plate_id']) # For debugging
                 # Simulate randomness
                 time.sleep(random.uniform(1, 10))
