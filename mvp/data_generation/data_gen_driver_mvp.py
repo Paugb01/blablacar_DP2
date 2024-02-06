@@ -13,7 +13,7 @@ import argparse
 import logging
 #import secrets
 import json
-#import time
+import time
 
 
 # Define functions to parse the KMLs and generate data (courses, drivers, passengers)
@@ -59,38 +59,43 @@ def create_driver(kml_file):
     driver['location'] = driver['course'][0]
     return driver
 
+def gen_drivers(n_drivers, kml_file):
+    # Generate driver
+    drivers_list = []
+    for driver in range(n_drivers):
+        drivers_list.append(create_driver(kml_file))
 
-def create_passenger():
-    passenger = {}
-    passenger['passenger_id'] = ''.join(
-        random.choices(string.digits, k=8) + random.choices(string.ascii_letters, k=1)).upper()
-    passenger['pick_location'] = tuple()
-    passenger['dropoff_location'] = tuple()
-    passenger['distance'] = float()
-    passenger['location'] = tuple()
-    return passenger
+    # Driver
 
+    try:
+        # Use PubSubMessages as a context manager
+        pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name)
+        for driver in drivers_list:
+            for i in range(len(driver['course'])):
+                driver['location'] = driver['course'][i]
+                print(driver['location'])
+                # Publish driver messages
+                print("Publishing driver message:", driver['plate_id']) # For debugging
+                pubsub_class.publish_messages_driver(driver)
+                print("Driver message published:", driver['plate_id']) # For debugging
+                # Simulate randomness
+                time.sleep(random.uniform(1, 10))
+    except Exception as err:
+        logging.error("Error while inserting data into the PubSub Topic: %s", err)
 
 class PubSubMessages:
     """ Publish Messages in our PubSub Topic """
 
-    def __init__(self, project_id: str, topic_driver: str, topic_passenger: str):
+    def __init__(self, project_id: str, topic_driver: str):
         self.publisher = pubsub_v1.PublisherClient()
         self.project_id = project_id
         self.topic_driver_name = topic_driver
-        self.topic_passenger_name = topic_passenger
         self.topic_driver_path = self.publisher.topic_path(self.project_id, self.topic_driver_name)
-        self.topic_passenger_path = self.publisher.topic_path(self.project_id, self.topic_passenger_name)
-
+        
     def publish_messages_driver(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_driver_path, json_str.encode("utf-8"))
         logging.info("A new vehicle has been monitored. Id: %s", message['plate_id'])
-
-    def publish_messages_passenger(self, message: str):
-        json_str = json.dumps(message)
-        self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
-        logging.info("A new passenger has been monitored. Id: %s", message['passenger_id'])
 
     def close(self):
         self.publisher.transport.close()
@@ -103,51 +108,15 @@ class PubSubMessages:
         self.close()
 
 if __name__ == "__main__":
-    # Main code
+        # Main code
 
-    # Input arguments
+        # Input arguments
         parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_driver_name', required=True, help='PubSub_driver topic name.')
-        parser.add_argument('--topic_passenger_name', required=True, help='PubSub_passenger topic name.')
         args, opts = parser.parse_known_args()
 
         # KML file path
         kml_file = "../Rutas/calle_brasil_a_mestalla.kml"
         # Generate drivers
-        n_drivers = 1
-        drivers_list = []
-        for driver in range(n_drivers):
-            drivers_list.append(create_driver(kml_file))
-        # Generate passenger
-        n_passengers = 1
-        passenger_list = []
-        for passenger in range(n_passengers):
-            passenger_list.append(create_passenger())
-            passenger_list[passenger]['location'] = course_points(kml_file)[75]
-
-        # Parse each list and convert them into JSONS
-        # Drivers
-        driver_json_list = [json.dumps(item) for item in drivers_list]
-        # Passengers
-        passenger_json_list = [json.dumps(item) for item in passenger_list]
-
-        try:
-            # Use PubSubMessages as a context manager
-            # Publish driver messages
-            for driver in driver_json_list:
-                # print("Publishing driver message:", driver) # For debugging
-                pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name, args.topic_passenger_name)
-                pubsub_class.publish_messages_driver(json.loads(driver))
-                # print("Driver message published:", driver) # For debugging
-
-            # Publish passenger messages
-            for passenger in passenger_json_list:
-                # print("Publishing passenger message:", passenger) # For debugging
-                pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name, args.topic_passenger_name)
-                pubsub_class.publish_messages_passenger(json.loads(passenger))
-                # print("Passenger message published:", passenger) # For debugging
-            # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
-            pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name, args.topic_passenger_name)
-        except Exception as err:
-            logging.error("Error while inserting data into the PubSub Topic: %s", err)
+        gen_drivers(1, kml_file)
