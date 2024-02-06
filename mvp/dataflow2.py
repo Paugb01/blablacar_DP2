@@ -45,7 +45,6 @@ def split_location(message):
     return message
     
 
-
 def run():
     with beam.Pipeline(options=PipelineOptions(streaming=True, save_main_session=True)) as p:
         (
@@ -60,6 +59,7 @@ def run():
                 create_disposition=beam.io.BigQueryDisposition.CREATE_NEVER,
                 write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
             )
+
         )
 
 if __name__ == '__main__':
