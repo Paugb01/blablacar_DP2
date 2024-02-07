@@ -2,74 +2,87 @@ import apache_beam as beam
 import json
 import logging
 from apache_beam.options.pipeline_options import PipelineOptions
-from apache_beam.io.gcp import bigquery_tools
-
-
+from apache_beam.transforms.window import FixedWindows
+from datetime import timedelta
 
 # Variables
 project_id = "involuted-river-411314"
 subscription_name = "dp2_driver-sub"
+subscription_name2 = "dp2_passenger-sub"
 bq_dataset = "dp2"
 bq_table = "driver"
 bucket_name = "dataflow-staging-us-central1-1069963786536"
 
-#decodificar el mensaje
+# Decode the message
 def decode_message(msg):
     output = msg.decode('utf-8')
-    logging.info("New PubSub Message: %s", output)
     return json.loads(output)
 
-def transform_course_to_string(message):
-    logging.info("Applying transform_course_to_string function...")
-    # Verificar si la clave "course" está presente es una lista
-    if 'course' in message and isinstance(message['course'], list):
-        # Convertir la lista a un string
-        course_str = str(message['course'])
-        # Actualizar el valor de la clave "course" 
-        message['course'] = course_str
-    return message
-
-def split_location(message):
-    logging.info("Applying split_location function...")
-    # Verificar si la clave "location" está presente en el diccionario
+# Extract location from the message
+def extract_location(message):
     if 'location' in message:
-        # Obtener la tupla de coordenadas de la clave "location"
-        location_tuple = message['location']
-        # Asignar la primera y segunda coordenada a las variables "latitud" y "longitud"
-        location_latitud, location_longitud = location_tuple
-        # Actualizar el diccionario con las nuevas variables
-        message['location_latitud'] = location_latitud
-        message['location_longitud'] = location_longitud
-        # Eliminar la clave "location" original si se desea
-        del message['location']
-    return message
-    
+        return message['location']
+    return None
 
 def run():
     with beam.Pipeline(options=PipelineOptions(streaming=True, save_main_session=True)) as p:
-        (
+        driver_locations = (
             p 
-            | "ReadFromPubSub" >> beam.io.ReadFromPubSub(subscription=f'projects/{project_id}/subscriptions/{subscription_name}')
-            | "decode msg" >> beam.Map(decode_message)
-            | "Transform Course" >> beam.Map(transform_course_to_string)
-            | "Split Location" >> beam.Map(split_location)
-            | "Write to BigQuery" >>  beam.io.WriteToBigQuery(
-                table=f"{project_id}:{bq_dataset}.{bq_table}",
-                schema='plate_id:STRING,course:STRING,seats:INTEGER,passengers:INTEGER,trip_cost:FLOAT,full_tariff:FLOAT,location_latitud:FLOAT,location_longitud:FLOAT',
-                create_disposition=beam.io.BigQueryDisposition.CREATE_NEVER,
-                write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
-            )
+            | "ReadFromPubSub1" >> beam.io.ReadFromPubSub(subscription=f'projects/{project_id}/subscriptions/{subscription_name}')
+            | "Decode msg" >> beam.Map(decode_message)
+            | "Extract Location for Driver" >> beam.Map(lambda x: ('driver', extract_location(x)) if 'plate_id' in x else None)  # Extract location only for messages with 'plate_id'
+            | "Filter None Values" >> beam.Filter(lambda x: x is not None)  # Remove None values resulting from messages without 'plate_id'
+            | "Assign Driver Windows" >> beam.WindowInto(FixedWindows(size=int(timedelta(minutes=1).total_seconds()))))  # Adjust window size as per your requirement
 
+        passenger_locations = (
+            p
+            | "ReadFromPubSub2" >> beam.io.ReadFromPubSub(subscription=f'projects/{project_id}/subscriptions/{subscription_name2}')
+            | "Decode msg2" >> beam.Map(decode_message)
+            | "Extract Location for Passenger" >> beam.Map(lambda x: ('passenger', extract_location(x)))
+            | "Assign Passenger Windows" >> beam.WindowInto(FixedWindows(size=int(timedelta(minutes=1).total_seconds()))))  # Adjust window size as per your requirement
+
+        # CoGroupByKey to ensure the same key for driver and passenger locations
+        merged_locations = (
+            {'driver': driver_locations, 'passenger': passenger_locations}
+            | "Merge Locations" >> beam.CoGroupByKey()
         )
 
-if __name__ == '__main__':
+        def log_and_return(item):
+            logging.info("Merged Locations: %s", item)
+            return item
 
+        def filter_matching_locations(item):
+            logging.info("Checking if driver and passenger locations match:")
+            logging.info("Driver locations: %s", item[1]['driver'])
+            logging.info("Passenger locations: %s", item[1]['passenger'])
+            
+            driver_location = item[1]['driver']
+            passenger_location = item[1]['passenger']
+            
+            # Check if both driver and passenger locations are non-empty lists
+            if driver_location and passenger_location and len(driver_location) > 0 and len(passenger_location) > 0:
+                match = driver_location[0] == passenger_location[0]
+                logging.info("Coordinates comparison result: %s", match)
+            else:
+                match = False
+            
+            logging.info("Locations match: %s", match)
+            return match
+
+        matched_locations = (
+            merged_locations
+            | "Log Merged Locations" >> beam.Map(log_and_return)
+            | "Filter Matching Locations" >> beam.Filter(filter_matching_locations)
+            | "Get Matching Locations" >> beam.Map(lambda x: x[1]['driver'])
+        )
+
+        matched_locations | "Print Matching Locations" >> beam.Map(print)
+
+
+if __name__ == '__main__':
     # Set Logs
     logging.getLogger().setLevel(logging.INFO)
-
     logging.info("The process started")
 
-
-        
     # Run Process
     run()

@@ -74,6 +74,7 @@ def gen_passenger(n_passengers, kml_file):
             print("Publishing passenger message:", passenger['passenger_id']) # For debugging
             pubsub_class.publish_messages_passenger(passenger)
             print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
+            #pubsub_class.__exit__()
         PubSubMessages(args.project_id, args.topic_passenger_name)
         # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
     except Exception as err:
@@ -100,7 +101,7 @@ class PubSubMessages:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self):
         self.close()
 
 if __name__ == "__main__":
