@@ -1,0 +1,7 @@
+apache_beam==2.51
+pandas==1.5.3
+google.cloud
+argparse
+google-cloud-bigquery[gcp]==3.13
+google-cloud-pubsub[gcp]==2.18.1
+apache-beam[gcp]==2.51
