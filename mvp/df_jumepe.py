@@ -3,7 +3,6 @@ from apache_beam.options.pipeline_options import PipelineOptions
 import argparse
 import logging
 import json
-import random
 
 beam.options.pipeline_options.PipelineOptions.allow_non_parallel_instruction_output = True
 
@@ -21,44 +20,13 @@ class AssignDriverFn(beam.DoFn):
     def process(self, element):
         msg = element
         location = msg.get('location')
-        driver_id = msg.get('plate_id')  # Extract plate_id as driver_id
-        yield (driver_id, location)
+        yield location
 
 class AssignPassengerFn(beam.DoFn):
     def process(self, element):
         msg = element
         location = msg.get('location')
-        passenger_id = msg.get('passenger_id')  # Extract passenger_id
-        yield (passenger_id, location)
-
-def process_matches(element):
-    driver_id, passenger_id = element[0], element[1]
-    driver_locations = list(driver_id)
-    passenger_locations = list(passenger_id)
-
-    logging.info("Driver ID: %s", driver_id)
-    logging.info("Passenger ID: %s", passenger_id)
-    logging.info("Driver locations: %s", driver_locations)
-    logging.info("Passenger locations: %s", passenger_locations)
-
-    if driver_id != passenger_id:
-        for driver_location in driver_locations:
-            for passenger_location in passenger_locations:
-                if driver_location == passenger_location:
-                    logging.info("Match: Locations match.")
-                    trip_id = generate_trip_id(driver_id, passenger_id)
-                    logging.info("Trip ID: %s, Plate ID: %s, Passenger ID: %s", trip_id, driver_id, passenger_id)
-                else:
-                    logging.info("No Match: Locations do not match.")
-    else:
-        logging.info("No Match: Driver and passenger IDs are the same.")
-
-def generate_trip_id(driver_id, passenger_id):
-    return random.randint(1000, 9999)
-
-
-def generate_trip_id(driver_id, passenger_id):
-    return random.randint(1000, 9999)
+        yield location
 
 def run():
     parser = argparse.ArgumentParser(description=('Arguments for the Dataflow Streaming Pipeline.'))
@@ -71,28 +39,33 @@ def run():
     options = PipelineOptions(pipeline_args, streaming=True, project=args.project_id)
 
     with beam.Pipeline(options=options) as pipeline:
-
-        driver_msgs = (
+        driver_locations = (
             pipeline
             | "Read Driver Messages" >> beam.io.ReadFromPubSub(subscription=args.driver_subscription)
             | "Parse Driver Messages" >> beam.ParDo(ParsePubSubMessageFn())
-            | "Assign Driver" >> beam.ParDo(AssignDriverFn())
-            | "Fixed Window Driver" >> beam.WindowInto(beam.window.FixedWindows(10))  # 10 seconds window
+            | "Assign Driver Locations" >> beam.ParDo(AssignDriverFn())
         )
 
-        passenger_msgs = (
+        passenger_locations = (
             pipeline
             | "Read Passenger Messages" >> beam.io.ReadFromPubSub(subscription=args.passenger_subscription)
             | "Parse Passenger Messages" >> beam.ParDo(ParsePubSubMessageFn())
-            | "Assign Passenger" >> beam.ParDo(AssignPassengerFn())
-            | "Fixed Window Passenger" >> beam.WindowInto(beam.window.FixedWindows(10))  # 10 seconds window
+            | "Assign Passenger Locations" >> beam.ParDo(AssignPassengerFn())
         )
 
-        joined_msgs = (
-            {'driver_msgs': driver_msgs, 'passenger_msgs': passenger_msgs}
-            | "Merge PCollections" >> beam.CoGroupByKey()
-            | "Process Matches" >> beam.Map(process_matches)
-        )
+        # Combine the driver and passenger locations into a single PCollection
+        combined_locations = (driver_locations, passenger_locations) | beam.Flatten()
+
+        # Define a function to compare driver and passenger locations
+        def compare_locations(locations):
+            driver_location, passenger_location = locations
+            if driver_location == passenger_location:
+                logging.info("Match: Locations match.")
+            else:
+                logging.info("No Match: Locations do not match.")
+
+        # Apply the function to compare locations
+        combined_locations | "Compare Locations" >> beam.Map(compare_locations)
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
