@@ -48,22 +48,22 @@ def course_points(kml_file):  # This function parses the KML file and returns a 
     return course
 
 
-def create_driver(kml_file):
+def create_driver():
     driver = {}
     driver['plate_id'] = ''.join(random.choices(string.digits, k=4) + random.choices(string.ascii_letters, k=3)).upper()
-    driver['course'] = course_points(kml_file)
+    #driver['course'] = course_points(kml_file)
     driver['seats'] = int(random.uniform(4, 6))
-    driver['passengers'] = 0
-    driver['trip_cost'] = 5.0
+    #driver['passengers'] = 0
+    #driver['trip_cost'] = 5.0
     driver['full_tariff'] = 5.0
-    driver['location'] = driver['course'][0]
+    driver['location'] : tuple()
     return driver
 
-def gen_drivers(n_drivers, kml_file):
+def gen_drivers(n_drivers, course):
     # Generate driver
     drivers_list = []
     for driver in range(n_drivers):
-        drivers_list.append(create_driver(kml_file))
+        drivers_list.append(create_driver())
 
     # Driver
 
@@ -71,8 +71,8 @@ def gen_drivers(n_drivers, kml_file):
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name)
         for driver in drivers_list:
-            for i in range(len(driver['course'])):
-                driver['location'] = driver['course'][i]
+            for i in range(len(course)):
+                driver['location'] = course[i]
                 print(driver['location'])
                 # Publish driver messages
                 print("Publishing driver message:", driver['plate_id']) # For debugging
@@ -116,7 +116,9 @@ if __name__ == "__main__":
         parser.add_argument('--topic_driver_name', required=True, help='PubSub_driver topic name.')
         args, opts = parser.parse_known_args()
 
-        # KML file path
-        kml_file = "../Rutas/calle_brasil_a_mestalla.kml"
+        # Parse KML and assign to course
+        kml_file = "../Rutas/debug_samelocation.kml"
+        course = course_points(kml_file)
+
         # Generate drivers
-        gen_drivers(1, kml_file)
+        gen_drivers(1, course)

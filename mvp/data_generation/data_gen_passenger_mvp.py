@@ -13,7 +13,7 @@ import argparse
 import logging
 #import secrets
 import json
-#import time
+import time
 
 
 # Define functions to parse the KMLs and generate data (courses, drivers, passengers)
@@ -47,6 +47,7 @@ def course_points(kml_file):  # This function parses the KML file and returns a 
     course = tuple(zip(course_df['Longitude'], course_df['Latitude']))
     return course
 
+
 def create_passenger():
     passenger = {}
     passenger['passenger_id'] = ''.join(
@@ -57,26 +58,27 @@ def create_passenger():
     passenger['location'] = tuple()
     return passenger
 
-def gen_passenger(n_passengers, kml_file):
+def gen_passengers(n_passengers, course):
     # Generate passenger
-    passenger_list = []
+    passengers_list = []
     for passenger in range(n_passengers):
-        passenger_list.append(create_passenger())
-        passenger_list[passenger]['location'] = random.choice(course_points(kml_file))
+        passengers_list.append(create_passenger())
 
-    # Passengers
+    # passenger
 
     try:
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
-        # Publish passenger messages
-        for passenger in passenger_list:
-            print("Publishing passenger message:", passenger['passenger_id']) # For debugging
-            pubsub_class.publish_messages_passenger(passenger)
-            print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
-            #pubsub_class.__exit__()
-        PubSubMessages(args.project_id, args.topic_passenger_name)
-        # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
+        for passenger in passengers_list:
+            for i in range(len(course)):
+                passenger['location'] = course[i]
+                print(passenger['location'])
+                # Publish passenger messages
+                print("Publishing passenger message:", passenger['passenger_id']) # For debugging
+                pubsub_class.publish_messages_passenger(passenger)
+                print("Passenger message published:", passenger['passenger_id']) # For debugging
+                # Simulate randomness
+                time.sleep(random.uniform(1, 10))
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
 
@@ -88,7 +90,7 @@ class PubSubMessages:
         self.project_id = project_id
         self.topic_passenger_name = topic_passenger
         self.topic_passenger_path = self.publisher.topic_path(self.project_id, self.topic_passenger_name)
-
+        
     def publish_messages_passenger(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
@@ -105,15 +107,17 @@ class PubSubMessages:
         self.close()
 
 if __name__ == "__main__":
-    # Main code
+        # Main code
 
-    # Input arguments
-        parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
+        # Input arguments
+        parser = argparse.ArgumentParser(description=('Passenger Data Generator'))
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_passenger_name', required=True, help='PubSub_passenger topic name.')
         args, opts = parser.parse_known_args()
 
-        # KML file path
-        kml_file = "../Rutas/calle_brasil_a_mestalla.kml"
+        # Parse KML and assign to course
+        kml_file = "../Rutas/debug_samelocation.kml"
+        course = course_points(kml_file)
 
-        gen_passenger(1, kml_file)
+        # Generate passengers
+        gen_passengers(1, course)
