@@ -31,7 +31,7 @@ class MatchMessagesFn(beam.DoFn):
         for driver in drivers:
             for passenger in passengers:
                 if driver[2] == passenger[2]:  # Compara ubicaciones
-                    match_message = f"Coincidencia encontrada: Conductor {driver[1]} y Pasajero {passenger[1]} en {driver[2]}"
+                    match_message = f"MATCH FOUND: Driver {driver[1]} and passenger {passenger[1]} at {driver[2]}"
                     logging.info(match_message)
                     yield match_message
 
