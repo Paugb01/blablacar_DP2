@@ -66,7 +66,7 @@ def run():
         matches = (
             (driver_msgs, passenger_msgs)
             | 'Flatten PCollections' >> beam.Flatten()
-            | "Window into 10-Second Intervals" >> beam.WindowInto(beam.window.FixedWindows(10))
+            | "Window into 10-Second Intervals" >> beam.WindowInto(beam.window.FixedWindows(10)) # Me he vuelto loco para entender BIEN por qué necesitamos establecer una ventana...
             | 'Key Messages by Location' >> beam.Map(lambda x: (x[2], x))
             | 'Group Messages by Location' >> beam.GroupByKey()
             | 'Match Messages' >> beam.ParDo(MatchMessagesFn())
