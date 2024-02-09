@@ -116,7 +116,7 @@ if __name__ == "__main__":
         args, opts = parser.parse_known_args()
 
         # Parse KML and assign to course
-        kml_file = "../Rutas/debug_samelocation.kml"
+        kml_file = "../Rutas/debug_samelocation_passenger.kml"
         course = course_points(kml_file)
 
         # Generate passengers
