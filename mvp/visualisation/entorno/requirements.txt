@@ -1,5 +1,0 @@
-confluent_kafka
-pandas
-streamlit
-folium
-streamlit_folium
