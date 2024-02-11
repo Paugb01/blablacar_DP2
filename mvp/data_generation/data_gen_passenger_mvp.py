@@ -52,9 +52,9 @@ def create_passenger():
     passenger = {}
     passenger['passenger_id'] = ''.join(
         random.choices(string.digits, k=8) + random.choices(string.ascii_letters, k=1)).upper()
-    passenger['pick_location'] = tuple()
-    passenger['dropoff_location'] = tuple()
-    passenger['distance'] = float()
+    # passenger['pick_location'] = tuple()
+    passenger['dropoff_location'] = (-0.38778,39.47809)
+    # passenger['distance'] = float()
     passenger['location'] = tuple()
     return passenger
 
