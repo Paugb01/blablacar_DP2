@@ -1,3 +1,6 @@
+# DATAPROJECT 2 - EDEM - Masters in Big Data & Cloud
+# 
+
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
 from apache_beam.io.gcp.bigquery import WriteToBigQuery, BigQueryDisposition
@@ -5,55 +8,67 @@ import argparse
 import logging
 import json
 import uuid
+import math
 from google.cloud import pubsub_v1
 
 # Configuración del Publicador para Pub/Sub
 publisher = pubsub_v1.PublisherClient()
-topic_name = 'projects/involuted-river-411314/topics/dp2_streamlit_test'  # Actualiza esto con tu topic real
+topic_name = 'projects/involuted-river-411314/topics/dp2_streamlit_test'  # Actualizar con topic final...
 
 def publish_location(message):
     """Publica datos de ubicación a un topic de Pub/Sub para visualización en tiempo real."""
     message_bytes = json.dumps(message).encode("utf-8")
     publisher.publish(topic_name, message_bytes)
 
-class ParsePubSubMessageFn(beam.DoFn):
-    """Parsea mensajes de Pub/Sub, identificando si son de conductores o pasajeros."""
+class ParseAndRepublishMessageFn(beam.DoFn):
+    """Parsea mensajes de Pub/Sub y los re-publica inmediatamente."""
     def process(self, element):
         message = element.decode('utf-8')
         logging.info(f"Received message: {message}")
         try:
             msg = json.loads(message)
+            # Re-publicar el mensaje inmediatamente para visualización
+            publish_location(msg)  # Mensaje original
             if 'plate_id' in msg:  # Mensaje de conductor
-                yield ('driver', msg['plate_id'], tuple(msg['location']))
+                yield ('driver', msg)
             elif 'passenger_id' in msg:  # Mensaje de pasajero
-                yield ('passenger', msg['passenger_id'], tuple(msg['location']))
+                yield ('passenger', msg)
         except Exception as e:
-            logging.error(f"Failed to parse message: {e}")
+            logging.error(f"Failed to parse and republish message: {e}")
 
 class MatchMessagesFn(beam.DoFn):
-    """Busca coincidencias entre conductores y pasajeros basándose en su ubicación."""
+    """Matches drivers and passengers based on location proximity."""
     def process(self, element, window=beam.DoFn.WindowParam):
         _, messages = element
-        drivers = [msg for msg in messages if msg[0] == 'driver']
-        passengers = [msg for msg in messages if msg[0] == 'passenger']
+        tolerance = 0.00027027  # Aprox. 30 metros, en grados
 
-        for driver in drivers:
-            for passenger in passengers:
-                if driver[2] == passenger[2]:  # Compara ubicaciones
-                    # Convertir ubicación a WKT
-                    pickup_location_wkt = f"POINT({driver[2][1]} {driver[2][0]})"
-                    match_message = {
-                        'trip_id': str(uuid.uuid4()),
-                        'driver_id': driver[1],
-                        'passenger_id': passenger[1],
-                        'pickup_location': pickup_location_wkt,
-                        'status': 'matched'
-                    }
-                    # Publicar coincidencia para visualización y almacenamiento
-                    logging.info(f"Match found: Driver {driver[1]} and Passenger {passenger[1]} at {pickup_location_wkt}")
-                    publish_location(match_message)
-                    yield match_message
-
+        for driver_msg in messages:
+            if driver_msg[0] == 'driver':
+                driver = driver_msg[1]
+                driver_loc = driver['location']
+                for passenger_msg in messages:
+                    if passenger_msg[0] == 'passenger':
+                        passenger = passenger_msg[1]
+                        passenger_loc = passenger['location']
+                        # Calculata la diferencia de coordenadas
+                        lat_diff = abs(driver_loc[0] - passenger_loc[0])
+                        lon_diff = abs(driver_loc[1] - passenger_loc[1])
+                        
+                        # Comprueba si entran en el gap 
+                        if lat_diff <= tolerance and lon_diff <= tolerance:
+                            # Monta y devuelve el mensaje de macheo...
+                            pickup_location_wkt = f"POINT({driver_loc[1]} {driver_loc[0]})"
+                            dropoff_location_wkt = f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})"
+                            match_message = {
+                                'trip_id': str(uuid.uuid4()),
+                                'driver_id': driver['plate_id'],
+                                'passenger_id': passenger['passenger_id'],
+                                'pickup_location': pickup_location_wkt,
+                                'dropoff_location': dropoff_location_wkt,
+                                'status': 'matched'
+                            }
+                            logging.info(f"Match encontrado en 30m: Driver {driver['plate_id']} y passenger {passenger['passenger_id']}")
+                            yield match_message
 
 def run():
     parser = argparse.ArgumentParser(description='Pipeline de Dataflow para procesar y emparejar ubicaciones.')
@@ -69,20 +84,20 @@ def run():
         driver_msgs = (
             pipeline
             | 'Read Driver Messages' >> beam.io.ReadFromPubSub(subscription=args.driver_subscription)
-            | 'Parse Driver Messages' >> beam.ParDo(ParsePubSubMessageFn())
+            | 'Parse and Republish Driver Messages' >> beam.ParDo(ParseAndRepublishMessageFn())
         )
 
         passenger_msgs = (
             pipeline
             | 'Read Passenger Messages' >> beam.io.ReadFromPubSub(subscription=args.passenger_subscription)
-            | 'Parse Passenger Messages' >> beam.ParDo(ParsePubSubMessageFn())
+            | 'Parse and Republish Passenger Messages' >> beam.ParDo(ParseAndRepublishMessageFn())
         )
 
         matches = (
             (driver_msgs, passenger_msgs)
             | 'Flatten PCollections' >> beam.Flatten()
             | "Window into 10-Second Intervals" >> beam.WindowInto(beam.window.FixedWindows(10))
-            | 'Key Messages by Location' >> beam.Map(lambda x: (x[2], x))
+            | 'Key Messages by Location' >> beam.Map(lambda x: (x[1]['location'], x))
             | 'Group Messages by Location' >> beam.GroupByKey()
             | 'Match Messages' >> beam.ParDo(MatchMessagesFn())
         )
