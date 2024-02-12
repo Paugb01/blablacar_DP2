@@ -5,6 +5,7 @@ import argparse
 import logging
 import json
 import uuid
+import math
 from google.cloud import pubsub_v1
 
 # Configuración del Publicador para Pub/Sub
@@ -33,19 +34,27 @@ class ParseAndRepublishMessageFn(beam.DoFn):
             logging.error(f"Failed to parse and republish message: {e}")
 
 class MatchMessagesFn(beam.DoFn):
-    """Busca coincidencias entre conductores y pasajeros basándose en su ubicación."""
+    """Matches drivers and passengers based on location proximity."""
     def process(self, element, window=beam.DoFn.WindowParam):
         _, messages = element
+        tolerance = 0.00027027  # Approx. 30 meters in degrees
+
         for driver_msg in messages:
             if driver_msg[0] == 'driver':
-                driver = driver_msg[1]  # Access the dictionary containing the driver's details
+                driver = driver_msg[1]
+                driver_loc = driver['location']
                 for passenger_msg in messages:
                     if passenger_msg[0] == 'passenger':
-                        passenger = passenger_msg[1]  # Access the dictionary containing the passenger's details
-                        # Compare locations directly from the dictionaries
-                        if driver['location'] == passenger['location']:
-                            # Convert locations to WKT for BigQuery
-                            pickup_location_wkt = f"POINT({driver['location'][1]} {driver['location'][0]})"
+                        passenger = passenger_msg[1]
+                        passenger_loc = passenger['location']
+                        # Calculate the difference in coordinates
+                        lat_diff = abs(driver_loc[0] - passenger_loc[0])
+                        lon_diff = abs(driver_loc[1] - passenger_loc[1])
+                        
+                        # Check if both differences are within the tolerance
+                        if lat_diff <= tolerance and lon_diff <= tolerance:
+                            # Proceed with creating and yielding the match message...
+                            pickup_location_wkt = f"POINT({driver_loc[1]} {driver_loc[0]})"
                             dropoff_location_wkt = f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})"
                             match_message = {
                                 'trip_id': str(uuid.uuid4()),
@@ -55,7 +64,7 @@ class MatchMessagesFn(beam.DoFn):
                                 'dropoff_location': dropoff_location_wkt,
                                 'status': 'matched'
                             }
-                            logging.info(f"Match found: Driver {driver['plate_id']} and Passenger {passenger['passenger_id']} at {pickup_location_wkt}")
+                            logging.info(f"Match found within 30m: Driver {driver['plate_id']} and Passenger {passenger['passenger_id']}")
                             yield match_message
 
 def run():
