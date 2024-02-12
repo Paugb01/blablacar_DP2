@@ -36,34 +36,27 @@ class MatchMessagesFn(beam.DoFn):
     """Busca coincidencias entre conductores y pasajeros basándose en su ubicación."""
     def process(self, element, window=beam.DoFn.WindowParam):
         _, messages = element
-        drivers = [msg for msg in messages if msg[0] == 'driver']
-        passengers = [msg for msg in messages if msg[0] == 'passenger']
-
-        for driver in drivers:
-            for passenger in passengers:
-                # Assuming the location comparison for a match is still valid
-                if driver[2] == passenger[2]:  # Compara ubicaciones
-                    # Convertir ubicación a WKT para BigQuery
-                    pickup_location_wkt = f"POINT({driver[2][1]} {driver[2][0]})"
-                    # Assuming passenger message contains 'dropoff_location' field
-                    dropoff_location = passenger[1].get('dropoff_location', None)
-                    # Convert dropoff_location to WKT if it's not None and is a list or tuple
-                    if dropoff_location and isinstance(dropoff_location, (list, tuple)):
-                        dropoff_location_wkt = f"POINT({dropoff_location[1]} {dropoff_location[0]})"
-                    else:
-                        dropoff_location_wkt = None
-
-                    match_message = {
-                        'trip_id': str(uuid.uuid4()),
-                        'driver_id': driver[1],
-                        'passenger_id': passenger[1],
-                        'pickup_location': pickup_location_wkt,
-                        'dropoff_location': dropoff_location_wkt,
-                        'status': 'matched'
-                    }
-                    # Publicar coincidencia para visualización y almacenamiento
-                    logging.info(f"Match found: Driver {driver[1]} and Passenger {passenger[1]} at {pickup_location_wkt}")
-                    yield match_message
+        for driver_msg in messages:
+            if driver_msg[0] == 'driver':
+                driver = driver_msg[1]  # Access the dictionary containing the driver's details
+                for passenger_msg in messages:
+                    if passenger_msg[0] == 'passenger':
+                        passenger = passenger_msg[1]  # Access the dictionary containing the passenger's details
+                        # Compare locations directly from the dictionaries
+                        if driver['location'] == passenger['location']:
+                            # Convert locations to WKT for BigQuery
+                            pickup_location_wkt = f"POINT({driver['location'][1]} {driver['location'][0]})"
+                            dropoff_location_wkt = f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})"
+                            match_message = {
+                                'trip_id': str(uuid.uuid4()),
+                                'driver_id': driver['plate_id'],
+                                'passenger_id': passenger['passenger_id'],
+                                'pickup_location': pickup_location_wkt,
+                                'dropoff_location': dropoff_location_wkt,
+                                'status': 'matched'
+                            }
+                            logging.info(f"Match found: Driver {driver['plate_id']} and Passenger {passenger['passenger_id']} at {pickup_location_wkt}")
+                            yield match_message
 
 def run():
     parser = argparse.ArgumentParser(description='Pipeline de Dataflow para procesar y emparejar ubicaciones.')
