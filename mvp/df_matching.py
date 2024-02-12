@@ -37,14 +37,13 @@ class ParseAndRepublishMessageFn(beam.DoFn):
             logging.error(f"Failed to parse and republish message: {e}")
 
 class MatchMessagesFn(beam.DoFn):
-    """Matches drivers and passengers based on location proximity and calculates the trip details."""
+    """Matchea drivers y passengers con una tolerancia a la posición"""
 
     def haversine(self, lon1, lat1, lon2, lat2):
         """
-        Calculate the great circle distance in kilometers between two points 
-        on the earth (specified in decimal degrees).
+        Cálculo de la distancia dependiendo de los grados y la curvatura de la Tierra...fórmula Haversine
         """
-        # Convert decimal degrees to radians 
+        # De grados a radianes 
         lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
 
         # Haversine formula 
@@ -52,12 +51,12 @@ class MatchMessagesFn(beam.DoFn):
         dlat = lat2 - lat1 
         a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
         c = 2 * asin(sqrt(a)) 
-        r = 6371  # Radius of earth in kilometers
+        r = 6371  # Radio de la Tierra en km
         return c * r
 
     def process(self, element, window=beam.DoFn.WindowParam):
         _, messages = element
-        tolerance = 0.00027027  # Approx. 30 meters in degrees
+        tolerance = 0.00027027  # Aprox. 30 m in grados
 
         for driver_msg in messages:
             if driver_msg[0] == 'driver':
@@ -73,7 +72,7 @@ class MatchMessagesFn(beam.DoFn):
                         if lat_diff <= tolerance and lon_diff <= tolerance:
                             dropoff_loc = passenger['dropoff_location']
                             travelled_distance = self.haversine(driver_loc[1], driver_loc[0], dropoff_loc[1], dropoff_loc[0])
-                            cost = travelled_distance * 0.08  # Cost calculation: €0.08/km
+                            cost = travelled_distance * 0.08  # Cost: €0.08/km
                             
                             match_message = {
                                 'trip_id': str(uuid.uuid4()),
@@ -81,11 +80,11 @@ class MatchMessagesFn(beam.DoFn):
                                 'passenger_id': passenger['passenger_id'],
                                 'pickup_location': f"POINT({driver_loc[1]} {driver_loc[0]})",
                                 'dropoff_location': f"POINT({dropoff_loc[1]} {dropoff_loc[0]})",
-                                'status': 'dropped off',  # Updated status
+                                'status': 'dropped off',  # Status actualizado
                                 'travelled_distance': travelled_distance,
                                 'cost': cost
                             }
-                            logging.info(f"Match and drop-off processed: Driver {driver['plate_id']} and Passenger {passenger['passenger_id']} - Distance: {travelled_distance} km, Cost: €{cost}")
+                            logging.info(f"Match y drop-off procesado: Driver {driver['plate_id']} y passenger {passenger['passenger_id']} - Distancia: {travelled_distance} km, Coste: €{cost}")
                             yield match_message
 
 def run():
