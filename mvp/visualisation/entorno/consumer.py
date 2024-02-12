@@ -42,8 +42,8 @@ try:
             # Process received message
             try:
                 location = json.loads(msg.value().decode('utf-8'))
-                latitude_driver = location["lat"]
-                longitude_driver = location["lon"]
+                longitude_driver = location["lat"]
+                latitude_driver = location["lon"]
 
                 # Update marker location
                 marker.location = (latitude_driver, longitude_driver)

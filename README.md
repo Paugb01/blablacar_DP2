@@ -21,3 +21,8 @@
         -   Added data_gen_driver_mvp/data_gen_passenger.py scripts. Original script has been split in two, which can be handled separately. Driver script generates a motion with random.uniform, looping through the course points and passing the values to its location key. It passes the payload with the updated location to PubSub each loop.
         -   Passenger code generates the passenger payload with a location chosen randomly from the course.
 >>>>>>> main
+-   11/02/2023:
+    -   jumepe: [MODIFIED] df_matching.py:
+        -   1.⁠ ⁠Adquiere mensajes de pubsub de driver y passenger y lo primero lo re-envia a otro topic para streamlit.
+        -   2.⁠ ⁠⁠Los mensajes que recibe, los procesa y si hay match, crea un mensaje con trip_id, passenger_id, driver_id, pickup_location, dropoff_location y cost. Creé una tabla con travelled_distance, a ver si se nos ocurre como pasar puntos a km. Otra estrategia sería matchear por location Y precio, de viaje, esto se puede discutir.
+        -   3.⁠ ⁠⁠Manda el mensaje de match a bigquery (osea, escribe en la tabla).

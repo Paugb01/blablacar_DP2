@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import json
+import stramlit_folium
+from streamlit_folium import folium_static
+import folium 
 
 # Function to fetch data from GeoJSON file
 def fetch_data_from_json():
