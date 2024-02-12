@@ -10,7 +10,7 @@ from google.cloud import pubsub_v1
 
 # Configuración del Publicador para Pub/Sub
 publisher = pubsub_v1.PublisherClient()
-topic_name = 'projects/involuted-river-411314/topics/dp2_streamlit_test'  # Actualiza esto con tu topic real
+topic_name = 'projects/involuted-river-411314/topics/dp2_streamlit_test'  # Actualizar con topic final...
 
 def publish_location(message):
     """Publica datos de ubicación a un topic de Pub/Sub para visualización en tiempo real."""
@@ -25,7 +25,7 @@ class ParseAndRepublishMessageFn(beam.DoFn):
         try:
             msg = json.loads(message)
             # Re-publicar el mensaje inmediatamente para visualización
-            publish_location(msg)  # Aquí se re-publica el mensaje original
+            publish_location(msg)  # Mensaje original
             if 'plate_id' in msg:  # Mensaje de conductor
                 yield ('driver', msg)
             elif 'passenger_id' in msg:  # Mensaje de pasajero
@@ -37,7 +37,7 @@ class MatchMessagesFn(beam.DoFn):
     """Matches drivers and passengers based on location proximity."""
     def process(self, element, window=beam.DoFn.WindowParam):
         _, messages = element
-        tolerance = 0.00027027  # Approx. 30 meters in degrees
+        tolerance = 0.00027027  # Aprox. 30 metros, en grados
 
         for driver_msg in messages:
             if driver_msg[0] == 'driver':
@@ -47,13 +47,13 @@ class MatchMessagesFn(beam.DoFn):
                     if passenger_msg[0] == 'passenger':
                         passenger = passenger_msg[1]
                         passenger_loc = passenger['location']
-                        # Calculate the difference in coordinates
+                        # Calculata la diferencia de coordenadas
                         lat_diff = abs(driver_loc[0] - passenger_loc[0])
                         lon_diff = abs(driver_loc[1] - passenger_loc[1])
                         
-                        # Check if both differences are within the tolerance
+                        # Comprueba si entran en el gap 
                         if lat_diff <= tolerance and lon_diff <= tolerance:
-                            # Proceed with creating and yielding the match message...
+                            # Monta y devuelve el mensaje de macheo...
                             pickup_location_wkt = f"POINT({driver_loc[1]} {driver_loc[0]})"
                             dropoff_location_wkt = f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})"
                             match_message = {
@@ -64,7 +64,7 @@ class MatchMessagesFn(beam.DoFn):
                                 'dropoff_location': dropoff_location_wkt,
                                 'status': 'matched'
                             }
-                            logging.info(f"Match found within 30m: Driver {driver['plate_id']} and Passenger {passenger['passenger_id']}")
+                            logging.info(f"Match encontrado en 30m: Driver {driver['plate_id']} y passenger {passenger['passenger_id']}")
                             yield match_message
 
 def run():
