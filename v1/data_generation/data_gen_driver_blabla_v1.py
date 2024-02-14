@@ -105,7 +105,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Ejecuta la generación de conductores sin usar threading para simplificar la depuración
-    directorio_principal = '..\\Rutas'  # Asegúrate de actualizar esta ruta
+    directorio_principal = '../Rutas'  # Asegúrate de actualizar esta ruta
     ruta_archivo = archivo_aleatorio(directorio_principal)
     print(f"Archivo KML procesado: {ruta_archivo}")
     course = course_points(ruta_archivo)
