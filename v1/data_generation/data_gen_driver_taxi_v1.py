@@ -14,6 +14,21 @@ import logging
 #import secrets
 import json
 import time
+import os
+import threading
+
+def archivo_aleatorio(directorio):
+    
+    archivos = os.listdir(directorio)# Obtener la lista de archivos en el directorio
+    archivos_kml = [archivo for archivo in archivos if archivo.endswith('.kml')]  # Filtrar los archivos KML
+    if not archivos_kml:
+        raise FileNotFoundError("No se encontraron archivos KML en el directorio especificado.")
+    archivo_seleccionado = random.choice(archivos_kml)  # Seleccionar aleatoriamente un archivo KML
+    ruta_archivo = os.path.join(directorio, archivo_seleccionado)
+    with open(ruta_archivo, 'r') as archivo:
+        contenido = archivo.read()
+    return ruta_archivo, contenido
+
 
 
 # Define functions to parse the KMLs and generate data (courses, drivers, passengers)
@@ -79,9 +94,17 @@ def gen_drivers(n_drivers, course):
                 pubsub_class.publish_messages_driver(driver)
                 print("Driver message published:", driver['plate_id']) # For debugging
                 # Simulate randomness
-                time.sleep(random.uniform(1, 10))
+                time.sleep(random.uniform(1, 8))
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
+
+def run_gen_drivers():
+    while True:
+        directorio_principal = '..\\Rutas'
+        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
+        print(ruta_archivo)
+        course = course_points(ruta_archivo)
+        gen_drivers(1, course)
 
 class PubSubMessages:
     """ Publish Messages in our PubSub Topic """
@@ -115,10 +138,14 @@ if __name__ == "__main__":
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_driver_name', required=True, help='PubSub_driver topic name.')
         args, opts = parser.parse_known_args()
+ 
+        
+        threads = []
+        
+        for _ in range(8):  
+            thread = threading.Thread(target=run_gen_drivers)
+            thread.start()
+            threads.append(thread)
 
-        # Parse KML and assign to course
-        kml_file = "../Rutas/calle_brasil_a_mestalla.kml"
-        course = course_points(kml_file)
-
-        # Generate drivers
-        gen_drivers(1, course)
+        for thread in threads:
+            thread.join()    
