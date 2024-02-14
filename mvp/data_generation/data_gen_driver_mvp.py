@@ -14,6 +14,21 @@ import logging
 #import secrets
 import json
 import time
+import os
+import threading
+
+def archivo_aleatorio(directorio):
+    
+    archivos = os.listdir(directorio)# Obtener la lista de archivos en el directorio
+    archivos_kml = [archivo for archivo in archivos if archivo.endswith('.kml')]  # Filtrar los archivos KML
+    if not archivos_kml:
+        raise FileNotFoundError("No se encontraron archivos KML en el directorio especificado.")
+    archivo_seleccionado = random.choice(archivos_kml)  # Seleccionar aleatoriamente un archivo KML
+    ruta_archivo = os.path.join(directorio, archivo_seleccionado)
+    with open(ruta_archivo, 'r') as archivo:
+        contenido = archivo.read()
+    return ruta_archivo, contenido
+
 
 
 # Define functions to parse the KMLs and generate data (courses, drivers, passengers)
@@ -48,22 +63,22 @@ def course_points(kml_file):  # This function parses the KML file and returns a 
     return course
 
 
-def create_driver(kml_file):
+def create_driver():
     driver = {}
     driver['plate_id'] = ''.join(random.choices(string.digits, k=4) + random.choices(string.ascii_letters, k=3)).upper()
-    driver['course'] = course_points(kml_file)
+    #driver['course'] = course_points(kml_file)
     driver['seats'] = int(random.uniform(4, 6))
-    driver['passengers'] = 0
-    driver['trip_cost'] = 5.0
+    #driver['passengers'] = 0
+    #driver['trip_cost'] = 5.0
     driver['full_tariff'] = 5.0
-    driver['location'] = driver['course'][0]
+    driver['location'] : tuple()
     return driver
 
-def gen_drivers(n_drivers, kml_file):
+def gen_drivers(n_drivers, course):
     # Generate driver
     drivers_list = []
     for driver in range(n_drivers):
-        drivers_list.append(create_driver(kml_file))
+        drivers_list.append(create_driver())
 
     # Driver
 
@@ -71,17 +86,25 @@ def gen_drivers(n_drivers, kml_file):
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name)
         for driver in drivers_list:
-            for i in range(len(driver['course'])):
-                driver['location'] = driver['course'][i]
+            for i in range(len(course)):
+                driver['location'] = course[i]
                 print(driver['location'])
                 # Publish driver messages
                 print("Publishing driver message:", driver['plate_id']) # For debugging
                 pubsub_class.publish_messages_driver(driver)
                 print("Driver message published:", driver['plate_id']) # For debugging
                 # Simulate randomness
-                time.sleep(random.uniform(1, 10))
+                time.sleep(random.uniform(1, 8))
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
+
+def run_gen_drivers():
+    while True:
+        directorio_principal = '..\\Rutas'
+        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
+        print(ruta_archivo)
+        course = course_points(ruta_archivo)
+        gen_drivers(1, course)
 
 class PubSubMessages:
     """ Publish Messages in our PubSub Topic """
@@ -115,8 +138,14 @@ if __name__ == "__main__":
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_driver_name', required=True, help='PubSub_driver topic name.')
         args, opts = parser.parse_known_args()
+ 
+        
+        threads = []
+        
+        for _ in range(8):  
+            thread = threading.Thread(target=run_gen_drivers)
+            thread.start()
+            threads.append(thread)
 
-        # KML file path
-        kml_file = "../Rutas/calle_brasil_a_mestalla.kml"
-        # Generate drivers
-        gen_drivers(1, kml_file)
+        for thread in threads:
+            thread.join()    
