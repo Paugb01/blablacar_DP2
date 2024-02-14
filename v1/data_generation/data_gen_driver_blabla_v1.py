@@ -67,18 +67,21 @@ def gen_drivers(n_drivers, course, project_id, topic_driver_name):
     Genera conductores, calcula tarifas y publica los mensajes en Pub/Sub.
     """
     drivers_list = [create_driver() for _ in range(n_drivers)]
-    if course:
-        first_point = course[0]
-        last_point = course[-1]
-        distance_km = haversine(first_point[0], first_point[1], last_point[0], last_point[1])
+    
+    # Calcular la distancia total del recorrido
+    total_distance_km = 0.0
+    if len(course) > 1:
+        for i in range(len(course) - 1):
+            total_distance_km += haversine(course[i][0], course[i][1], course[i+1][0], course[i+1][1])
+    print(total_distance_km)
     
     pubsub_class = PubSubMessages(project_id, topic_driver_name)
     for driver in drivers_list:
-        driver['full_tariff'] = distance_km * 0.50 # 0.50€/km por ejemplo...
+        driver['full_tariff'] = total_distance_km * 0.50  # Asumiendo €0.50 por km como tarifa
         driver['ride_offer'] = driver['full_tariff'] / driver['seats']
-        for i, location in enumerate(course):
+        for location in course:
             driver['location'] = location
-            logging.info(f"Publicando mensaje del conductor: {driver['plate_id']} en la ubicación {driver['location']}")
+            logging.info(f"Publicando mensaje del conductor: {driver['plate_id']} en la ubicación {location}")
             pubsub_class.publish_messages_driver(driver)
             time.sleep(random.uniform(1, 8))
 
