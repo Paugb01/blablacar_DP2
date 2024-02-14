@@ -54,7 +54,7 @@ def create_driver():
     Crea un conductor con información aleatoria.
     """
     driver = {
-        'plate_id': ''.join(random.choices(string.ascii_letters, k=3) + random.choices(string.digits, k=4)).upper(),
+        'plate_id': ''.join(random.choices(string.digits, k=4) + random.choices(string.ascii_letters, k=3)).upper(),
         'seats': int(random.uniform(4, 6)),
         'full_tariff': 0.0,  # Se calculará basado en el recorrido
         'ride_offer': 0.0,  # Se calculará basado en full_tariff y asientos
