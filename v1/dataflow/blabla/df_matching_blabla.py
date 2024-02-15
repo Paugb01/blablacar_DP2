@@ -21,7 +21,7 @@ class ParseAndRepublishMessageFn(beam.DoFn):
     """Parsea mensajes de PubSub y los re-publica inmediatamente"""
     def process(self, element):
         message = element.decode('utf-8')
-        logging.info(f"Received message: {message}")
+        logging.info(f"Mensaje recibido: {message}")
         try:
             msg = json.loads(message)
             # Re-publicar el mensaje inmediatamente para visualización
@@ -29,7 +29,7 @@ class ParseAndRepublishMessageFn(beam.DoFn):
             if 'plate_id' in msg or 'passenger_id' in msg:  # Mensaje de conductor o pasajero
                 yield msg
         except Exception as e:
-            logging.error(f"Failed to parse and republish message: {e}")
+            logging.error(f"Error parseando y re-publicando mensaje: {e}")
 
 class MatchMessagesFn(beam.DoFn):
     """Matchea drivers y passengers con una tolerancia a la posición y compatibilidad de oferta de viaje."""
