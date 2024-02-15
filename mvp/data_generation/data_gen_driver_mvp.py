@@ -100,7 +100,7 @@ def gen_drivers(n_drivers, course):
 
 def run_gen_drivers():
     while True:
-        directorio_principal = '..\\Rutas'
+        directorio_principal = '../Rutas'
         ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
         print(ruta_archivo)
         course = course_points(ruta_archivo)
