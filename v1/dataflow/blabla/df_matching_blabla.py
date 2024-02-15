@@ -45,10 +45,9 @@ class MatchMessagesFn(beam.DoFn):
         return c * r
 
     def ride_offer_within_range(self, driver_offer, passenger_offer):
-        """Verifica si las ofertas de viaje están dentro del ±25% de diferencia."""
-        lower_bound = passenger_offer * 0.75
-        upper_bound = passenger_offer * 1.25
-        return lower_bound <= driver_offer <= upper_bound
+        """Verifica si las ofertas del passenger es al menos un 75% de la oferta del driver"""
+        lower_bound = driver_offer * 0.75
+        return passenger_offer >= lower_bound
 
     def process(self, element, window=beam.DoFn.WindowParam):
         _, messages = element
