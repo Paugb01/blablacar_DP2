@@ -8,7 +8,6 @@ import pandas as pd
 import random
 import string
 from google.cloud import pubsub_v1
-#import threading
 import argparse
 import logging
 #import secrets
@@ -16,6 +15,26 @@ import json
 import time
 import os
 import threading
+from google.cloud import bigquery
+
+# Función para insertar cada conductor creado en BigQuery
+def insert_driver_to_bigquery(driver, project_id, dataset_name, table_name):
+    client = bigquery.Client(project=project_id)
+    table_id = f"{project_id}.{dataset_name}.{table_name}"
+
+    # Construye una nueva fila con los datos
+    row_to_insert = [{
+        "plate_id": driver['plate_id'],
+        "seats": driver['seats'],
+        "passengers": driver.get('passengers', 0)  # Inicializamos a 0
+    }]
+
+    # Inserta la entrada en BQ
+    errors = client.insert_rows_json(table_id, row_to_insert)
+    if errors == []:
+        logging.info(f"Driver insertado en BQ: {driver['plate_id']}")
+    else:
+        logging.error(f"Error insertando en BQ: {errors}")
 
 def archivo_aleatorio(directorio):
     
@@ -31,7 +50,7 @@ def archivo_aleatorio(directorio):
 
 
 
-# Define functions to parse the KMLs and generate data (courses, drivers, passengers)
+# Funciones para parsear KMLs y generar datos (courses, drivers, passengers)
 
 def course_points(kml_file):  # This function parses the KML file and returns a DF with the course.
     # Specify the path to your KML file
@@ -49,16 +68,16 @@ def course_points(kml_file):  # This function parses the KML file and returns a 
     coordinates_str = root.findall(".//{http://www.opengis.net/kml/2.2}Placemark")[0].find(
         ".//{http://www.opengis.net/kml/2.2}coordinates").text.strip()
 
-    # Split coordinates string into individual values and convert to floats
+    # Separamos string en puntos individuales
     coordinates = [list(map(float, coord.split(','))) for coord in coordinates_str.split()]
 
-    # Create a DF for the placemark
+    # DF para el Placemark
     course_df = pd.DataFrame(coordinates, columns=['Longitude', 'Latitude', 'Altitude'])
 
-    # Drop 'Altitude' from the DF
+    # Eliminamos 'Altitude' del DF
     course_df = course_df.drop('Altitude', axis=1)
 
-    # Returns a list of tuples
+    # Tuplas con los puntos de la ruta
     course = tuple(zip(course_df['Longitude'], course_df['Latitude']))
     return course
 
@@ -71,81 +90,66 @@ def create_driver():
     #driver['passengers'] = 0
     #driver['trip_cost'] = 5.0
     driver['full_tariff'] = 5.0
-    driver['location'] : tuple()
+    driver['location'] = tuple()
     return driver
 
 def gen_drivers(n_drivers, course):
-    # Generate driver
-    drivers_list = []
-    for driver in range(n_drivers):
-        drivers_list.append(create_driver())
-
+    # Genera drivers
+    drivers_list = [create_driver() for _ in range(n_drivers)]
+    
     # Driver
-
-    try:
-        # Use PubSubMessages as a context manager
-        pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name)
-        for driver in drivers_list:
-            for i in range(len(course)):
-                driver['location'] = course[i]
-                print(driver['location'])
-                # Publish driver messages
-                print("Publishing driver message:", driver['plate_id']) # For debugging
-                pubsub_class.publish_messages_driver(driver)
-                print("Driver message published:", driver['plate_id']) # For debugging
-                # Simulate randomness
-                time.sleep(random.uniform(1, 8))
-    except Exception as err:
-        logging.error("Error while inserting data into the PubSub Topic: %s", err)
+    # Instancia de PubSub
+    pubsub_class = PubSubMessages(args.project_id, args.topic_driver_name)
+    for driver in drivers_list:
+        insert_driver_to_bigquery(driver, 'involuted-river-411314', 'dp2', 'drivers')
+        for location in course:
+            driver['location'] = location
+            logging.info(f"Publicando mensaje del driver: {driver['plate_id']} en la ubicación {driver['location']}")
+            pubsub_class.publish_messages_driver(driver)
+            time.sleep(random.uniform(1, 8))
 
 def run_gen_drivers():
     while True:
-        directorio_principal = '..\\Rutas'
+        directorio_principal = '../Rutas'
         ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
         print(ruta_archivo)
         course = course_points(ruta_archivo)
         gen_drivers(1, course)
 
 class PubSubMessages:
-    """ Publish Messages in our PubSub Topic """
-
-    def __init__(self, project_id: str, topic_driver: str):
+    """
+    Publica mensajes en el topic de Pub/Sub.
+    """
+    def __init__(self, project_id, topic_driver_name):
         self.publisher = pubsub_v1.PublisherClient()
         self.project_id = project_id
-        self.topic_driver_name = topic_driver
-        self.topic_driver_path = self.publisher.topic_path(self.project_id, self.topic_driver_name)
+        self.topic_driver_name = topic_driver_name
+        self.topic_driver_path = self.publisher.topic_path(project_id, topic_driver_name)
         
-    def publish_messages_driver(self, message: str):
+    def publish_messages_driver(self, message):
         json_str = json.dumps(message)
-        self.publisher.publish(self.topic_driver_path, json_str.encode("utf-8"))
-        logging.info("A new vehicle has been monitored. Id: %s", message['plate_id'])
-
-    def close(self):
-        self.publisher.transport.close()
-        logging.info("PubSub Client closed.")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        future = self.publisher.publish(self.topic_driver_path, json_str.encode("utf-8"))
+        future.result()  # Espera a la publicación
+        logging.info(f"Vehículo monitoreado. Id: {message['plate_id']}")
 
 if __name__ == "__main__":
+
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
         # Main code
 
-        # Input arguments
-        parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
-        parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
-        parser.add_argument('--topic_driver_name', required=True, help='PubSub_driver topic name.')
-        args, opts = parser.parse_known_args()
+    # Input arguments
+    parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
+    parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
+    parser.add_argument('--topic_driver_name', required=True, help='PubSub_driver topic name.')
+    args, opts = parser.parse_known_args()
  
         
-        threads = []
+    threads = []
         
-        for _ in range(8):  
-            thread = threading.Thread(target=run_gen_drivers)
-            thread.start()
-            threads.append(thread)
+    for _ in range(8):
+        thread = threading.Thread(target=run_gen_drivers)
+        thread.start()
+        threads.append(thread)
 
-        for thread in threads:
-            thread.join()    
+    for thread in threads:
+        thread.join()    
