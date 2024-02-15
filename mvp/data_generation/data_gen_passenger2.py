@@ -1,7 +1,3 @@
-# This script:
-# 1. Parses a KML file and returns a list of tuples.
-# 2. Generates drivers and passengers
-# 3. Sends drivers and passengers messages (JSON) to their respective PubSub topics.
 
 import xml.etree.ElementTree as ET
 import pandas as pd
@@ -17,6 +13,7 @@ import time
 import threading
 from google.cloud import bigquery
 import random
+import os
 
 
 # Función para insertar cada conductor creado en BigQuery
@@ -91,7 +88,7 @@ def gen_passenger(n_passengers, coordinate):
         passenger_list[passenger]['ride_offer'] = random.uniform(1, 3)
         
     # Passengers
-    duration = 600 
+    duration = 200 
     try:
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
@@ -110,34 +107,50 @@ def gen_passenger(n_passengers, coordinate):
     
 
 
-def punto_aleatorio(x1, y1, x2, y2, x3, y3, x4, y4):
-    # Ordenar coordenadas
-    x_min = min(x1, x2, x3, x4)
-    x_max = max(x1, x2, x3, x4)
-    y_min = min(y1, y2, y3, y4)
-    y_max = max(y1, y2, y3, y4)
-    
-    # Generar punto aleatorio dentro del rectángulo delimitado
-    x = random.uniform(x_min, x_max)
-    y = random.uniform(y_min, y_max)
-    
-    return x, y
 
+
+def archivo_aleatorio(directorio):
+    
+    archivos = os.listdir(directorio)# Obtener la lista de archivos en el directorio
+    archivos_kml = [archivo for archivo in archivos if archivo.endswith('.kml')]  # Filtrar los archivos KML
+    if not archivos_kml:
+        raise FileNotFoundError("No se encontraron archivos KML en el directorio especificado.")
+    archivo_seleccionado = random.choice(archivos_kml)  # Seleccionar aleatoriamente un archivo KML
+    ruta_archivo = os.path.join(directorio, archivo_seleccionado)
+    with open(ruta_archivo, 'r') as archivo:
+        contenido = archivo.read()
+    return ruta_archivo, contenido
+
+def obtener_punto_aleatorio_desde_kml(contenido_kml):
+    # Parsear el contenido KML
+    root = ET.fromstring(contenido_kml)
+    
+    # Encontrar el elemento que contiene las coordenadas
+    coordinates_element = root.find(".//{http://www.opengis.net/kml/2.2}coordinates")
+    
+    if coordinates_element is not None:
+        # Obtener las coordenadas como una cadena
+        coordenadas = coordinates_element.text.strip()
+        
+        # Dividir las coordenadas en una lista de puntos
+        lista_puntos = coordenadas.split()
+        
+        # Elegir un punto aleatorio de la lista
+        punto_aleatorio= random.choice(lista_puntos)
+         # Convertir el punto aleatorio en una tupla
+        punto_aleatorio_tupla = tuple(map(float, punto_aleatorio.split(',')))
+            
+        return punto_aleatorio_tupla
+        
+    else:
+        return None
 
 def run_gen_passengers():
     while True:
-        # Coordenadas que delimitan la zona
-        x1, y1 = 39.500095, -0.424033
-        x2, y2 = 39.491574, -0.335757
-        x3, y3 = 39.443477, -0.405057
-        x4, y4 = 39.441132, -0.338529
-
-
-        # Obtener punto aleatorio dentro de la zona delimitada
-        punto = punto_aleatorio(x1, y1, x2, y2, x3, y3, x4, y4)
-        
-
-        gen_passenger(1, punto)
+       directorio_principal = '..\\Rutas'
+       ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
+       punto=obtener_punto_aleatorio_desde_kml(contenido_archivo)
+       gen_passenger(1, punto)
         
         
 
@@ -177,7 +190,7 @@ if __name__ == "__main__":
        
         threads = []
         
-        for _ in range(10):  
+        for _ in range(15):  
             thread = threading.Thread(target=run_gen_passengers)
             thread.start()
             threads.append(thread)
