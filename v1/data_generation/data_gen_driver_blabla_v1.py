@@ -93,7 +93,7 @@ def gen_drivers(n_drivers, course, project_id, topic_driver_name):
     if len(course) > 1:
         for i in range(len(course) - 1):
             total_distance_km += haversine(course[i][0], course[i][1], course[i+1][0], course[i+1][1])
-    print(total_distance_km)
+    # print(total_distance_km)
     
     pubsub_class = PubSubMessages(project_id, topic_driver_name)
     for driver in drivers_list:
