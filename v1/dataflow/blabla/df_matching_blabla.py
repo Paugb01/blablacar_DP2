@@ -10,10 +10,10 @@ from google.cloud import pubsub_v1
 
 # Configuración del Publicador para Pub/Sub
 publisher = pubsub_v1.PublisherClient()
-topic_name = 'projects/involuted-river-411314/topics/dp2_streamlit_test'  # Actualizar con topic final...
+topic_name = 'projects/involuted-river-411314/topics/dp2_streamlit_test'
 
 def publish_location(message):
-    """Publica datos de ubicación a un topic de PubSub para Streamlit"""
+    """Publica datos de ubicación a un topic de PubSub para visualización en tiempo real"""
     message_bytes = json.dumps(message).encode("utf-8")
     publisher.publish(topic_name, message_bytes)
 
@@ -24,64 +24,47 @@ class ParseAndRepublishMessageFn(beam.DoFn):
         logging.info(f"Mensaje recibido: {message}")
         try:
             msg = json.loads(message)
-            # Re-publicar el mensaje inmediatamente para visualización
-            publish_location(msg)  # Mensaje original
-            if 'plate_id' in msg or 'passenger_id' in msg:  # Mensaje de conductor o pasajero
-                yield msg
+            # Re-publicar el mensaje para visualización
+            publish_location(msg)
+            yield msg
         except Exception as e:
-            logging.error(f"Error parseando y re-publicando mensaje: {e}")
+            logging.error(f"Error al parsear y re-publicar mensaje: {e}")
 
 class MatchMessagesFn(beam.DoFn):
-    """Matchea drivers y passengers con una tolerancia a la posición y compatibilidad de oferta de viaje."""
-
+    """Matchea conductores y pasajeros basándose en la proximidad de ubicación y compatibilidad de oferta"""
     def haversine(self, lon1, lat1, lon2, lat2):
-        """Calcula la distancia entre dos puntos en la Tierra usando la fórmula Haversine."""
+        """Calcula la distancia Haversine entre dos puntos geográficos."""
         lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-        dlon = lon2 - lon1 
-        dlat = lat2 - lat1 
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
         a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-        c = 2 * asin(sqrt(a)) 
-        r = 6371  # Radio de la Tierra en kilómetros.
+        c = 2 * asin(sqrt(a))
+        r = 6371  # Radio de la Tierra en km
         return c * r
 
     def ride_offer_within_range(self, driver_offer, passenger_offer):
-        """Verifica si las ofertas del passenger es al menos un 75% de la oferta del driver"""
-        lower_bound = driver_offer * 0.75
-        return passenger_offer >= lower_bound
+        """Verifica si la oferta del pasajero es compatible con la del conductor"""
+        return passenger_offer >= driver_offer * 0.75
 
-    def process(self, element, window=beam.DoFn.WindowParam):
-        _, messages = element
-        tolerance = 0.00027027  # Aprox. 30 metros en grados.
-
-        for driver_msg in messages:
-            if driver_msg.get('plate_id'):  # Mensaje de driver
-                driver_loc = driver_msg['location']
-                driver_offer = driver_msg['ride_offer']
-                for passenger_msg in messages:
-                    if passenger_msg.get('passenger_id'):  # Mensaje de passenger
-                        passenger_loc = passenger_msg['location']
-                        passenger_offer = passenger_msg['ride_offer']
-                        
-                        if self.ride_offer_within_range(driver_offer, passenger_offer):
-                            lat_diff = abs(driver_loc[0] - passenger_loc[0])
-                            lon_diff = abs(driver_loc[1] - passenger_loc[1])
-                            
-                            if lat_diff <= tolerance and lon_diff <= tolerance:
-                                dropoff_loc = passenger_msg['dropoff_location']
-                                cost = min(driver_offer, passenger_offer)  # Lógica para decidir qué oferta usar
-                                
-                                match_message = {
-                                    'trip_id': str(uuid.uuid4()),
-                                    'driver_id': driver_msg['plate_id'],
-                                    'passenger_id': passenger_msg['passenger_id'],
-                                    'pickup_location': f"POINT({driver_loc[1]} {driver_loc[0]})",
-                                    'dropoff_location': f"POINT({dropoff_loc[1]} {dropoff_loc[0]})",
-                                    'status': 'dropped off',
-                                    'straight_distance': self.haversine(driver_loc[1], driver_loc[0], dropoff_loc[1], dropoff_loc[0]),
-                                    'cost': cost
-                                }
-                                logging.info(f"Match y drop-off procesado: Driver {driver_msg['plate_id']} y passenger {passenger_msg['passenger_id']} - Straight Distance: {match_message['straight_distance']} km, Cost: €{cost}")
-                                yield match_message
+    def process(self, element):
+        _, grouped_messages = element
+        for messages in grouped_messages:
+            drivers = [msg for msg in messages if 'plate_id' in msg]
+            passengers = [msg for msg in messages if 'passenger_id' in msg]
+            for driver in drivers:
+                for passenger in passengers:
+                    distance = self.haversine(driver['location'][1], driver['location'][0], passenger['location'][1], passenger['location'][0])
+                    if distance <= 0.00075 and self.ride_offer_within_range(driver['ride_offer'], passenger['ride_offer']):
+                        match_message = {
+                            'trip_id': str(uuid.uuid4()),
+                            'driver_id': driver['plate_id'],
+                            'passenger_id': passenger['passenger_id'],
+                            'pickup_location': f"POINT({driver['location'][1]} {driver['location'][0]})",
+                            'status': 'matched',
+                            'cost': passenger['ride_offer']  # Suponemos que el costo es la oferta del pasajero
+                        }
+                        logging.info(f"MATCHEO: Conductor {driver['plate_id']} y Pasajero {passenger['passenger_id']} - Coste: €{match_message['cost']}")
+                        yield match_message
 
 def run():
     parser = argparse.ArgumentParser(description='Pipeline de Dataflow para procesar y emparejar ubicaciones.')
@@ -96,29 +79,28 @@ def run():
     with beam.Pipeline(options=options) as pipeline:
         driver_msgs = (
             pipeline
-            | 'Read Driver Messages' >> beam.io.ReadFromPubSub(subscription=args.driver_subscription)
-            | 'Parse and Republish Driver Messages' >> beam.ParDo(ParseAndRepublishMessageFn())
+            | 'Leer mensajes de conductores' >> beam.io.ReadFromPubSub(subscription=args.driver_subscription)
+            | 'Parsear y re-publicar mensajes de conductores' >> beam.ParDo(ParseAndRepublishMessageFn())
         )
 
         passenger_msgs = (
             pipeline
-            | 'Read Passenger Messages' >> beam.io.ReadFromPubSub(subscription=args.passenger_subscription)
-            | 'Parse and Republish Passenger Messages' >> beam.ParDo(ParseAndRepublishMessageFn())
+            | 'Leer mensajes de pasajeros' >> beam.io.ReadFromPubSub(subscription=args.passenger_subscription)
+            | 'Parsear y re-publicar mensajes de pasajeros' >> beam.ParDo(ParseAndRepublishMessageFn())
         )
 
         matches = (
             (driver_msgs, passenger_msgs)
             | 'Flatten PCollections' >> beam.Flatten()
-            | "Window into 10-Second Intervals" >> beam.WindowInto(beam.window.FixedWindows(10))
-            | 'Key Messages by Shared Attribute' >> beam.Map(lambda x: ((x['location'], x['ride_offer']), x))
-            | 'Group Messages by Shared Attributes' >> beam.GroupByKey()
-            | 'Match Messages' >> beam.ParDo(MatchMessagesFn())
+            | "Ventana (15 segundos va bien)" >> beam.WindowInto(beam.window.FixedWindows(15))
+            | 'Key por Ubicación' >> beam.Map(lambda x: (x['location'], x))
+            | 'Agrupar mensajes por location' >> beam.GroupByKey()
+            | 'Matcheo' >> beam.ParDo(MatchMessagesFn())
         )
 
-        # Almacenar registros coincidentes en BigQuery
-        matches | 'Write to BigQuery' >> WriteToBigQuery(
+        matches | 'Escribir a BigQuery' >> WriteToBigQuery(
             'involuted-river-411314:dp2.trips_test',
-            schema='trip_id:STRING, driver_id:STRING, passenger_id:STRING, pickup_location:GEOGRAPHY, dropoff_location:GEOGRAPHY, status:STRING, straight_distance:FLOAT, cost:FLOAT',
+            schema='trip_id:STRING, driver_id:STRING, passenger_id:STRING, pickup_location:GEOGRAPHY, status:STRING, cost:FLOAT',
             create_disposition=BigQueryDisposition.CREATE_IF_NEEDED,
             write_disposition=BigQueryDisposition.WRITE_APPEND
         )

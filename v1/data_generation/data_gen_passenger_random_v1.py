@@ -81,26 +81,29 @@ def create_passenger():
     passenger['ride_offer']= round(float(), 2)
     return passenger
 
+def gen_passenger(n_passengers, coordinate):
+
     # Generate passenger
     passengers_list = []
     for passenger in range(n_passengers):
-        passenger_list.append(create_passenger())
-        passenger_list[passenger]['location'] = coordinate
-        passenger_list[passenger]['ride_offer'] = random.uniform(1, 3)
+        passengers_list.append(create_passenger())
+        passengers_list[passenger]['location'] = coordinate
+        passengers_list[passenger]['ride_offer'] = random.uniform(1, 3)
         
     # Passengers
-    duration = 600 
+    duration = 900 
     try:
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
         start_time = time.time()
         while time.time() - start_time < duration:  
             # Publish passenger messages
-            for passenger in passenger_list:            
+            for passenger in passengers_list:            
                 insert_passenger_to_bigquery(passenger, 'involuted-river-411314', 'dp2', 'passengers')
                 print("Publishing passenger message:", passenger['passenger_id']) # For debugging
                 pubsub_class.publish_messages_passenger(passenger)
                 print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
+                time.sleep(random.uniform(1, 8))
             PubSubMessages(args.project_id, args.topic_passenger_name)
             # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
             
