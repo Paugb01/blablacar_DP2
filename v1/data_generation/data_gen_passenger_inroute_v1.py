@@ -1,4 +1,3 @@
-
 import xml.etree.ElementTree as ET
 import pandas as pd
 import random
@@ -45,7 +44,7 @@ def course_points(kml_file):  # This function parses the KML file and returns a 
     # Parse the KML file
     tree = ET.parse(kml_file_path)
     root = tree.getroot()
-    
+
     # Extract coordinates from the correct Placemark entry. 
     # WATCH OUT HERE WITH THE Placemark")[0]. It should be 0 for all KML files but it may vary depending on the export.
     # To debug:
@@ -84,7 +83,7 @@ def gen_passenger(n_passengers, coordinate):
         passenger_list.append(create_passenger())
         passenger_list[passenger]['location'] = coordinate
         passenger_list[passenger]['ride_offer'] = random.uniform(1, 3)
-        
+
     # Passengers
     duration = 200 
     try:
@@ -102,13 +101,13 @@ def gen_passenger(n_passengers, coordinate):
             # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
-    
+
 
 
 
 
 def archivo_aleatorio(directorio):
-    
+
     archivos = os.listdir(directorio)# Obtener la lista de archivos en el directorio
     archivos_kml = [archivo for archivo in archivos if archivo.endswith('.kml')]  # Filtrar los archivos KML
     if not archivos_kml:
@@ -122,24 +121,24 @@ def archivo_aleatorio(directorio):
 def obtener_punto_aleatorio_desde_kml(contenido_kml):
     # Parsear el contenido KML
     root = ET.fromstring(contenido_kml)
-    
+
     # Encontrar el elemento que contiene las coordenadas
     coordinates_element = root.find(".//{http://www.opengis.net/kml/2.2}coordinates")
-    
+
     if coordinates_element is not None:
         # Obtener las coordenadas como una cadena
         coordenadas = coordinates_element.text.strip()
-        
+
         # Dividir las coordenadas en una lista de puntos
         lista_puntos = coordenadas.split()
-        
+
         # Elegir un punto aleatorio de la lista
         punto_aleatorio= random.choice(lista_puntos)
          # Convertir el punto aleatorio en una tupla
         punto_aleatorio_tupla = tuple(map(float, punto_aleatorio.split(',')))
-            
+
         return punto_aleatorio_tupla
-        
+
     else:
         return None
 
@@ -149,8 +148,8 @@ def run_gen_passengers():
        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
        punto=obtener_punto_aleatorio_desde_kml(contenido_archivo)
        gen_passenger(1, punto)
-        
-        
+
+
 
 class PubSubMessages:
     """ Publish Messages in our PubSub Topic """
@@ -164,11 +163,11 @@ class PubSubMessages:
     def publish_messages_passenger(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
-        logging.info("Nuevo pasajero. Id: %s", message['passenger_id'])
+        logging.info("A new passenger has been monitored. Id: %s", message['passenger_id'])
 
     def close(self):
         self.publisher.transport.close()
-        logging.info("Cliente PubSub cerrado.")
+        logging.info("PubSub Client closed.")
 
     def __enter__(self):
         return self
@@ -179,21 +178,20 @@ class PubSubMessages:
 if __name__ == "__main__":
     # Main code
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
     # Input arguments
-        parser = argparse.ArgumentParser(description=('Passenger Data Generator'))
+        parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_passenger_name', required=True, help='PubSub_passenger topic name.')
         args, opts = parser.parse_known_args()
 
-       
+
         threads = []
-        
+
         for _ in range(15):  
             thread = threading.Thread(target=run_gen_passengers)
             thread.start()
             threads.append(thread)
-         
+
 
         for thread in threads:
-            thread.join()    
+            thread.join()   
