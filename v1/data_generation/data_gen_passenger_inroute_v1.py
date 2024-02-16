@@ -164,11 +164,11 @@ class PubSubMessages:
     def publish_messages_passenger(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
-        logging.info("A new passenger has been monitored. Id: %s", message['passenger_id'])
+        logging.info("Nuevo pasajero. Id: %s", message['passenger_id'])
 
     def close(self):
         self.publisher.transport.close()
-        logging.info("PubSub Client closed.")
+        logging.info("Cliente PubSub cerrado.")
 
     def __enter__(self):
         return self
