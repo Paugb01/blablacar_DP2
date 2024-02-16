@@ -11,6 +11,7 @@ import threading
 from google.cloud import bigquery
 import random
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 # Función para insertar cada conductor creado en BigQuery
@@ -159,22 +160,33 @@ class PubSubMessages:
 
 # Main
 if __name__ == "__main__":
-    # Main code
-        logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-    # Input arguments
-        parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
-        parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
-        parser.add_argument('--topic_passenger_name', required=True, help='PubSub_passenger topic name.')
-        args, opts = parser.parse_known_args()
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    parser = argparse.ArgumentParser(description='Generador de Datos de Pasajeros')
+    parser.add_argument('--project_id', required=True, help='Nombre del proyecto de GCP.')
+    parser.add_argument('--topic_passenger_name', required=True, help='Nombre del topic de PubSub para pasajeros.')
+    args = parser.parse_args()
 
+    NUM_WORKERS = 50  # Número de trabajadores (tareas concurrentes)
 
-        threads = []
+    # Inicializa el ThreadPoolExecutor con el número deseado de trabajadores
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        # Mantén un conjunto de tareas futuras
+        futures = set()
+        
+        # Llena previamente el grupo con tareas iniciales
+        for _ in range(NUM_WORKERS):
+            futures.add(executor.submit(run_gen_passengers))
 
-        for _ in range(50):  # Aquí el no. de instancias simultáneas
-            thread = threading.Thread(target=run_gen_passengers)
-            thread.start()
-            threads.append(thread)
-
-
-        for thread in threads:
-            thread.join()   
+        # Monitorea continuamente y reemplaza las tareas completadas
+        while True:
+            # Utiliza as_completed para eliminar las tareas completadas del conjunto y enviar inmediatamente una nueva
+            for future in as_completed(futures):
+                futures.remove(future)  # Elimina la tarea completada
+                
+                try:
+                    result = future.result()  # Si es necesario, puedes procesar el resultado aquí
+                except Exception as exc:
+                    logging.error(f'La tarea generó una excepción: {exc}')
+                
+                # Envía inmediatamente una nueva tarea para mantener lleno el grupo
+                futures.add(executor.submit(run_gen_passengers))

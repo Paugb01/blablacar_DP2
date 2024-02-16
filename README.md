@@ -31,4 +31,5 @@
         -   1.⁠ Dos scripts DF para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
 -     16/02/2023:
     -   jumepe: [MODIFIED] data_gen_driver_mvp.py --> data_gen_driver_blabla/taxi_v1.py:
-        -   1.⁠ Dos scripts de generación de driver para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
+        -   1. Dos scripts de generación de driver para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
+        -   2. data_gen_driver/passenger_blabla modificados, ahora el threading funciona de forma que mantiene n instancias siempre corriendo, cuando una ruta/pasajero acaba, levanta otra.

@@ -11,6 +11,8 @@ import os
 import threading
 from math import radians, cos, sin, asin, sqrt
 from google.cloud import bigquery
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 # Función para meter el conductor en la tabla de BQ
 def insert_driver_to_bigquery(driver, project_id, dataset_name, table_name):
@@ -113,18 +115,20 @@ class PubSubMessages:
         future.result()
         logging.info(f"Vehículo monitoreado. Id: {message['plate_id']}")
 
-# Main
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generador de Datos de Vehículos')
     parser.add_argument('--project_id', required=True, help='Nombre del proyecto de GCP.')
     parser.add_argument('--topic_driver_name', required=True, help='Nombre del topic de PubSub para conductores.')
     args = parser.parse_args()
 
-    threads = []
-    for _ in range(20): # Aquí el no. de instancias simultáneas
-        thread = threading.Thread(target=run_gen_drivers, args=(args.project_id, args.topic_driver_name))
-        thread.start()
-        threads.append(thread)
+    # Definimos el número de workers para tener n instancias de run_gen_drivers constantemente activas
+    NUM_WORKERS = 20
 
-    for thread in threads:
-        thread.join()
+    # Crea un ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        # Loop infinito para levantar instancias cuando una se completa
+        futures = [executor.submit(run_gen_drivers, args.project_id, args.topic_driver_name) for _ in range(NUM_WORKERS)]
+        for future in as_completed(futures):
+            # As each task completes, submit a new one to keep the worker pool busy
+            futures.append(executor.submit(run_gen_drivers, args.project_id, args.topic_driver_name))
+
