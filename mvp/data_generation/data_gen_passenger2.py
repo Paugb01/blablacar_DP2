@@ -1,7 +1,3 @@
-# This script:
-# 1. Parses a KML file and returns a list of tuples.
-# 2. Generates drivers and passengers
-# 3. Sends drivers and passengers messages (JSON) to their respective PubSub topics.
 
 import xml.etree.ElementTree as ET
 import pandas as pd
@@ -15,7 +11,7 @@ import time
 import threading
 from google.cloud import bigquery
 import random
-
+import os
 
 
 # Función para insertar cada conductor creado en BigQuery
@@ -71,7 +67,6 @@ def course_points(kml_file):  # This function parses the KML file and returns a 
     course = tuple(zip(course_df['Longitude'], course_df['Latitude']))
     return course
 
-
 def create_passenger():
     passenger = {}
     passenger['passenger_id'] = ''.join(
@@ -81,15 +76,17 @@ def create_passenger():
     passenger['ride_offer']= round(float(), 2)
     return passenger
 
+
+def gen_passenger(n_passengers, coordinate):
     # Generate passenger
-    passengers_list = []
+    passenger_list = []
     for passenger in range(n_passengers):
         passenger_list.append(create_passenger())
         passenger_list[passenger]['location'] = coordinate
         passenger_list[passenger]['ride_offer'] = random.uniform(1, 3)
         
     # Passengers
-    duration = 600 
+    duration = 200 
     try:
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
@@ -103,40 +100,55 @@ def create_passenger():
                 print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
             PubSubMessages(args.project_id, args.topic_passenger_name)
             # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
-            
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
     
 
 
-def punto_aleatorio(x1, y1, x2, y2, x3, y3, x4, y4):
-    # Ordenar coordenadas
-    x_min = min(x1, x2, x3, x4)
-    x_max = max(x1, x2, x3, x4)
-    y_min = min(y1, y2, y3, y4)
-    y_max = max(y1, y2, y3, y4)
-    
-    # Generar punto aleatorio dentro del rectángulo delimitado
-    x = random.uniform(x_min, x_max)
-    y = random.uniform(y_min, y_max)
-    
-    return x, y
 
+
+def archivo_aleatorio(directorio):
+    
+    archivos = os.listdir(directorio)# Obtener la lista de archivos en el directorio
+    archivos_kml = [archivo for archivo in archivos if archivo.endswith('.kml')]  # Filtrar los archivos KML
+    if not archivos_kml:
+        raise FileNotFoundError("No se encontraron archivos KML en el directorio especificado.")
+    archivo_seleccionado = random.choice(archivos_kml)  # Seleccionar aleatoriamente un archivo KML
+    ruta_archivo = os.path.join(directorio, archivo_seleccionado)
+    with open(ruta_archivo, 'r') as archivo:
+        contenido = archivo.read()
+    return ruta_archivo, contenido
+
+def obtener_punto_aleatorio_desde_kml(contenido_kml):
+    # Parsear el contenido KML
+    root = ET.fromstring(contenido_kml)
+    
+    # Encontrar el elemento que contiene las coordenadas
+    coordinates_element = root.find(".//{http://www.opengis.net/kml/2.2}coordinates")
+    
+    if coordinates_element is not None:
+        # Obtener las coordenadas como una cadena
+        coordenadas = coordinates_element.text.strip()
+        
+        # Dividir las coordenadas en una lista de puntos
+        lista_puntos = coordenadas.split()
+        
+        # Elegir un punto aleatorio de la lista
+        punto_aleatorio= random.choice(lista_puntos)
+         # Convertir el punto aleatorio en una tupla
+        punto_aleatorio_tupla = tuple(map(float, punto_aleatorio.split(',')))
+            
+        return punto_aleatorio_tupla
+        
+    else:
+        return None
 
 def run_gen_passengers():
     while True:
-        # Coordenadas que delimitan la zona
-        x1, y1 = 39.500095, -0.424033
-        x2, y2 = 39.491574, -0.335757
-        x3, y3 = 39.443477, -0.405057
-        x4, y4 = 39.441132, -0.338529
-
-
-        # Obtener punto aleatorio dentro de la zona delimitada
-        punto = punto_aleatorio(x1, y1, x2, y2, x3, y3, x4, y4)
-        
-
-        gen_passenger(1, punto)
+       directorio_principal = '../Rutas'
+       ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
+       punto=obtener_punto_aleatorio_desde_kml(contenido_archivo)
+       gen_passenger(1, punto)
         
         
 
@@ -148,7 +160,7 @@ class PubSubMessages:
         self.project_id = project_id
         self.topic_passenger_name = topic_passenger
         self.topic_passenger_path = self.publisher.topic_path(self.project_id, self.topic_passenger_name)
-        
+
     def publish_messages_passenger(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
@@ -161,21 +173,22 @@ class PubSubMessages:
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
 if __name__ == "__main__":
-        # Main code
+    # Main code
 
-        # Input arguments
-        parser = argparse.ArgumentParser(description=('Passenger Data Generator'))
+    # Input arguments
+        parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_passenger_name', required=True, help='PubSub_passenger topic name.')
         args, opts = parser.parse_known_args()
+
        
         threads = []
         
-        for _ in range(10):  
+        for _ in range(15):  
             thread = threading.Thread(target=run_gen_passengers)
             thread.start()
             threads.append(thread)
