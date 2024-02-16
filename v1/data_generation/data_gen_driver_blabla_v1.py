@@ -108,7 +108,7 @@ def gen_drivers(n_drivers, course, project_id, topic_driver_name):
 
 def run_gen_drivers(project_id, topic_driver_name):
     """Cada thread ejecuta la función gen_drivers - Ruta a los archivos hardcodeada"""
-    directorio_principal = '../Rutas'  # Hardcoded path to the KML files
+    directorio_principal = '../Rutas/test'  # Hardcoded path to the KML files
     ruta_archivo = archivo_aleatorio(directorio_principal)
     logging.info(f"Procesando archivo KML: {ruta_archivo}")
     course = course_points(ruta_archivo)

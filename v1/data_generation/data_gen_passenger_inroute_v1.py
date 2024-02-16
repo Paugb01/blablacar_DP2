@@ -32,11 +32,11 @@ def insert_passenger_to_bigquery(passenger, project_id, dataset_name, table_name
     # Inserta la entrada en BQ
     errors = client.insert_rows_json(table_id, row_to_insert)
     if errors == []:
-        logging.info(f"Driver insertado en BQ: {passenger['passenger_id']}")
+        logging.info(f"Pasajero insertado en BQ: {passenger['passenger_id']}")
     else:
         logging.error(f"Error insertando en BQ: {errors}")
-# Define functions to parse the KMLs and generate data (courses, drivers, passengers)
 
+# Define functions to parse the KMLs and generate data (courses, drivers, passengers)
 def course_points(kml_file):  # This function parses the KML file and returns a DF with the course.
     # Specify the path to your KML file
     kml_file_path = kml_file
@@ -94,9 +94,9 @@ def gen_passenger(n_passengers, coordinate):
             # Publish passenger messages
             for passenger in passenger_list:            
                 insert_passenger_to_bigquery(passenger, 'involuted-river-411314', 'dp2', 'passengers')
-                print("Publishing passenger message:", passenger['passenger_id']) # For debugging
+                print("Publicando mensaje de pasajero:", passenger['passenger_id']) # For debugging
                 pubsub_class.publish_messages_passenger(passenger)
-                print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
+                print("Mensaje de pasajero publicado:", passenger['passenger_id'], passenger['location']) # For debugging
             PubSubMessages(args.project_id, args.topic_passenger_name)
             # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
     except Exception as err:
@@ -118,35 +118,36 @@ def archivo_aleatorio(directorio):
         contenido = archivo.read()
     return ruta_archivo, contenido
 
-def obtener_punto_aleatorio_desde_kml(contenido_kml):
-    # Parsear el contenido KML
-    root = ET.fromstring(contenido_kml)
+def obtener_punto_aleatorio_desde_course(course_points):
+    ## Parsear el contenido KML
+    # root = ET.fromstring(contenido_kml)
 
-    # Encontrar el elemento que contiene las coordenadas
-    coordinates_element = root.find(".//{http://www.opengis.net/kml/2.2}coordinates")
+    ## Encontrar el elemento que contiene las coordenadas
+    # coordinates_element = root.find(".//{http://www.opengis.net/kml/2.2}coordinates")
 
-    if coordinates_element is not None:
-        # Obtener las coordenadas como una cadena
-        coordenadas = coordinates_element.text.strip()
+    # if coordinates_element is not None:
+    #    # Obtener las coordenadas como una cadena
+    #    coordenadas = coordinates_element.text.strip()
 
-        # Dividir las coordenadas en una lista de puntos
-        lista_puntos = coordenadas.split()
+    #    # Dividir las coordenadas en una lista de puntos
+    #    lista_puntos = coordenadas.split()
 
-        # Elegir un punto aleatorio de la lista
-        punto_aleatorio= random.choice(lista_puntos)
+    # Elegir un punto aleatorio de la lista
+    punto_aleatorio= random.choice(course_points)
          # Convertir el punto aleatorio en una tupla
-        punto_aleatorio_tupla = tuple(map(float, punto_aleatorio.split(',')))
+    # punto_aleatorio_tupla = tuple(map(float, punto_aleatorio.split(',')))
 
-        return punto_aleatorio_tupla
+    return punto_aleatorio
 
-    else:
-        return None
+    # else:
+    #    return None
 
 def run_gen_passengers():
     while True:
-       directorio_principal = '../Rutas'
+       directorio_principal = '../Rutas/test'
        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
-       punto=obtener_punto_aleatorio_desde_kml(contenido_archivo)
+       course = course_points(ruta_archivo)
+       punto=obtener_punto_aleatorio_desde_course(course)
        gen_passenger(1, punto)
 
 
@@ -163,7 +164,7 @@ class PubSubMessages:
     def publish_messages_passenger(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
-        logging.info("A new passenger has been monitored. Id: %s", message['passenger_id'])
+        logging.info("Nuevo pasajero Id: %s", message['passenger_id'])
 
     def close(self):
         self.publisher.transport.close()
@@ -187,7 +188,7 @@ if __name__ == "__main__":
 
         threads = []
 
-        for _ in range(15):  
+        for _ in range(1):  
             thread = threading.Thread(target=run_gen_passengers)
             thread.start()
             threads.append(thread)
