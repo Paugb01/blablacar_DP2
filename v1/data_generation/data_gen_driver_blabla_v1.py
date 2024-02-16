@@ -116,19 +116,27 @@ class PubSubMessages:
         logging.info(f"Vehículo monitoreado. Id: {message['plate_id']}")
 
 if __name__ == "__main__":
+    # Configuración inicial del logging
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    
+    # Configuración del analizador de argumentos
     parser = argparse.ArgumentParser(description='Generador de Datos de Vehículos')
     parser.add_argument('--project_id', required=True, help='Nombre del proyecto de GCP.')
     parser.add_argument('--topic_driver_name', required=True, help='Nombre del topic de PubSub para conductores.')
     args = parser.parse_args()
-
-    # Definimos el número de workers para tener n instancias de run_gen_drivers constantemente activas
-    NUM_WORKERS = 20
-
-    # Crea un ThreadPoolExecutor
+    
+    # Número de trabajadores (threads) a mantener en ejecución simultáneamente
+    NUM_WORKERS = 50
+    
+    # Crear un ThreadPoolExecutor para gestionar la ejecución concurrente
     with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        # Loop infinito para levantar instancias cuando una se completa
-        futures = [executor.submit(run_gen_drivers, args.project_id, args.topic_driver_name) for _ in range(NUM_WORKERS)]
-        for future in as_completed(futures):
-            # As each task completes, submit a new one to keep the worker pool busy
-            futures.append(executor.submit(run_gen_drivers, args.project_id, args.topic_driver_name))
+        # Mientras sea True, el bucle continuará ejecutando las tareas de forma indefinida
+        while True:
+            # Crear y enviar las tareas al executor
+            futures = {executor.submit(run_gen_drivers, args.project_id, args.topic_driver_name) for _ in range(NUM_WORKERS)}
+            # Esperar a que cada tarea se complete antes de continuar
+            for future in as_completed(futures):
+                pass
+            # El bucle volverá a enviar las tareas aquí, manteniendo un grupo de tareas en ejecución.
+
 
