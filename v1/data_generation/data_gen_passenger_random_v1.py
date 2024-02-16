@@ -8,14 +8,38 @@ import pandas as pd
 import random
 import string
 from google.cloud import pubsub_v1
-#import threading
 import argparse
 import logging
-#import secrets
 import json
 import time
+import threading
+from google.cloud import bigquery
+import random
 
 
+
+# Función para insertar cada conductor creado en BigQuery
+def insert_passenger_to_bigquery(passenger, project_id, dataset_name, table_name):
+    client = bigquery.Client(project=project_id)
+    table_id = f"{project_id}.{dataset_name}.{table_name}"
+
+    location_struct = {
+    "longitude": passenger['location'][1],
+    "latitude": passenger['location'][0]
+}
+    # Construye una nueva fila con los datos
+    row_to_insert = [{
+        "passenger_id": passenger['passenger_id'],
+        "location": location_struct,
+        "ride_offer": passenger['ride_offer']  
+    }]
+
+    # Inserta la entrada en BQ
+    errors = client.insert_rows_json(table_id, row_to_insert)
+    if errors == []:
+        logging.info(f"Driver insertado en BQ: {passenger['passenger_id']}")
+    else:
+        logging.error(f"Error insertando en BQ: {errors}")
 # Define functions to parse the KMLs and generate data (courses, drivers, passengers)
 
 def course_points(kml_file):  # This function parses the KML file and returns a DF with the course.
@@ -52,35 +76,69 @@ def create_passenger():
     passenger = {}
     passenger['passenger_id'] = ''.join(
         random.choices(string.digits, k=8) + random.choices(string.ascii_letters, k=1)).upper()
-    # passenger['pick_location'] = tuple()
-    passenger['dropoff_location'] = (-0.35932,39.47466)
-    # passenger['distance'] = float()
+    passenger['pick_location'] = tuple()
     passenger['location'] = tuple()
+    passenger['ride_offer']= round(float(), 2)
     return passenger
 
-def gen_passengers(n_passengers, course):
     # Generate passenger
     passengers_list = []
     for passenger in range(n_passengers):
-        passengers_list.append(create_passenger())
-
-    # passenger
-
+        passenger_list.append(create_passenger())
+        passenger_list[passenger]['location'] = coordinate
+        passenger_list[passenger]['ride_offer'] = random.uniform(1, 3)
+        
+    # Passengers
+    duration = 600 
     try:
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
-        for passenger in passengers_list:
-            for i in range(len(course)):
-                passenger['location'] = course[i]
-                print(passenger['location'])
-                # Publish passenger messages
+        start_time = time.time()
+        while time.time() - start_time < duration:  
+            # Publish passenger messages
+            for passenger in passenger_list:            
+                insert_passenger_to_bigquery(passenger, 'involuted-river-411314', 'dp2', 'passengers')
                 print("Publishing passenger message:", passenger['passenger_id']) # For debugging
                 pubsub_class.publish_messages_passenger(passenger)
-                print("Passenger message published:", passenger['passenger_id']) # For debugging
-                # Simulate randomness
-                time.sleep(random.uniform(1, 10))
+                print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
+            PubSubMessages(args.project_id, args.topic_passenger_name)
+            # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
+            
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
+    
+
+
+def punto_aleatorio(x1, y1, x2, y2, x3, y3, x4, y4):
+    # Ordenar coordenadas
+    x_min = min(x1, x2, x3, x4)
+    x_max = max(x1, x2, x3, x4)
+    y_min = min(y1, y2, y3, y4)
+    y_max = max(y1, y2, y3, y4)
+    
+    # Generar punto aleatorio dentro del rectángulo delimitado
+    x = random.uniform(x_min, x_max)
+    y = random.uniform(y_min, y_max)
+    
+    return x, y
+
+
+def run_gen_passengers():
+    while True:
+        # Coordenadas que delimitan la zona
+        x1, y1 = 39.500095, -0.424033
+        x2, y2 = 39.491574, -0.335757
+        x3, y3 = 39.443477, -0.405057
+        x4, y4 = 39.441132, -0.338529
+
+
+        # Obtener punto aleatorio dentro de la zona delimitada
+        punto = punto_aleatorio(x1, y1, x2, y2, x3, y3, x4, y4)
+        
+
+        gen_passenger(1, punto)
+        
+        
 
 class PubSubMessages:
     """ Publish Messages in our PubSub Topic """
@@ -114,10 +172,14 @@ if __name__ == "__main__":
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_passenger_name', required=True, help='PubSub_passenger topic name.')
         args, opts = parser.parse_known_args()
+       
+        threads = []
+        
+        for _ in range(10):  
+            thread = threading.Thread(target=run_gen_passengers)
+            thread.start()
+            threads.append(thread)
+         
 
-        # Parse KML and assign to course
-        kml_file = "../Rutas/debug_samelocation_passenger.kml"
-        course = course_points(kml_file)
-
-        # Generate passengers
-        gen_passengers(1, course)
+        for thread in threads:
+            thread.join()    
