@@ -11,8 +11,6 @@ import os
 import threading
 from math import radians, cos, sin, asin, sqrt
 from google.cloud import bigquery
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 
 # Función para meter el conductor en la tabla de BQ
 def insert_driver_to_bigquery(driver, project_id, dataset_name, table_name):
@@ -95,7 +93,7 @@ def gen_drivers(n_drivers, course, project_id, topic_driver_name):
 
 # Función para montar el conductor a partir de la ruta
 def run_gen_drivers(project_id, topic_driver_name):
-    directorio_principal = '../Rutas'
+    directorio_principal = '../Rutas/test'
     ruta_archivo = archivo_aleatorio(directorio_principal)
     logging.info(f"Procesando archivo KML: {ruta_archivo}")
     course = course_points(ruta_archivo)
@@ -115,28 +113,18 @@ class PubSubMessages:
         future.result()
         logging.info(f"Vehículo monitoreado. Id: {message['plate_id']}")
 
+# Main
 if __name__ == "__main__":
-    # Configuración inicial del logging
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-    
-    # Configuración del analizador de argumentos
     parser = argparse.ArgumentParser(description='Generador de Datos de Vehículos')
     parser.add_argument('--project_id', required=True, help='Nombre del proyecto de GCP.')
     parser.add_argument('--topic_driver_name', required=True, help='Nombre del topic de PubSub para conductores.')
     args = parser.parse_args()
-    
-    # Número de trabajadores (threads) a mantener en ejecución simultáneamente
-    NUM_WORKERS = 50
-    
-    # Crear un ThreadPoolExecutor para gestionar la ejecución concurrente
-    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        # Mientras sea True, el bucle continuará ejecutando las tareas de forma indefinida
-        while True:
-            # Crear y enviar las tareas al executor
-            futures = {executor.submit(run_gen_drivers, args.project_id, args.topic_driver_name) for _ in range(NUM_WORKERS)}
-            # Esperar a que cada tarea se complete antes de continuar
-            for future in as_completed(futures):
-                pass
-            # El bucle volverá a enviar las tareas aquí, manteniendo un grupo de tareas en ejecución.
 
+    threads = []
+    for _ in range(10): 
+        thread = threading.Thread(target=run_gen_drivers, args=(args.project_id, args.topic_driver_name))
+        thread.start()
+        threads.append(thread)
 
+    for thread in threads:
+        thread.join()
