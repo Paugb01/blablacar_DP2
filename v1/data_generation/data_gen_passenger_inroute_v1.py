@@ -32,7 +32,7 @@ def insert_passenger_to_bigquery(passenger, project_id, dataset_name, table_name
     # Inserta la entrada en BQ
     errors = client.insert_rows_json(table_id, row_to_insert)
     if errors == []:
-        logging.info(f"Driver insertado en BQ: {passenger['passenger_id']}")
+        logging.info(f"Pasajero insertado en BQ: {passenger['passenger_id']}")
     else:
         logging.error(f"Error insertando en BQ: {errors}")
 
@@ -94,9 +94,9 @@ def gen_passenger(n_passengers, coordinate):
             # Publish passenger messages
             for passenger in passenger_list:            
                 insert_passenger_to_bigquery(passenger, 'involuted-river-411314', 'dp2', 'passengers')
-                print("Publishing passenger message:", passenger['passenger_id']) # For debugging
+                print("Publicando mensaje de pasajero:", passenger['passenger_id']) # For debugging
                 pubsub_class.publish_messages_passenger(passenger)
-                print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
+                print("Mensaje de pasajero publicado:", passenger['passenger_id'], passenger['location']) # For debugging
             PubSubMessages(args.project_id, args.topic_passenger_name)
             # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
     except Exception as err:
@@ -164,7 +164,7 @@ class PubSubMessages:
     def publish_messages_passenger(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
-        logging.info("A new passenger has been monitored. Id: %s", message['passenger_id'])
+        logging.info("Nuevo pasajero Id: %s", message['passenger_id'])
 
     def close(self):
         self.publisher.transport.close()
