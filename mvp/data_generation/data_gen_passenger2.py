@@ -4,10 +4,8 @@ import pandas as pd
 import random
 import string
 from google.cloud import pubsub_v1
-#import threading
 import argparse
 import logging
-#import secrets
 import json
 import time
 import threading
@@ -147,7 +145,7 @@ def obtener_punto_aleatorio_desde_kml(contenido_kml):
 
 def run_gen_passengers():
     while True:
-       directorio_principal = '..\\Rutas'
+       directorio_principal = '../Rutas'
        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
        punto=obtener_punto_aleatorio_desde_kml(contenido_archivo)
        gen_passenger(1, punto)
