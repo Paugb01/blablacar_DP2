@@ -173,14 +173,15 @@ class PubSubMessages:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self):
         self.close()
 
 if __name__ == "__main__":
     # Main code
+        logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
     # Input arguments
-        parser = argparse.ArgumentParser(description=('Vehicle Data Generator'))
+        parser = argparse.ArgumentParser(description=('Passenger Data Generator'))
         parser.add_argument('--project_id', required=True, help='GCP cloud project name.')
         parser.add_argument('--topic_passenger_name', required=True, help='PubSub_passenger topic name.')
         args, opts = parser.parse_known_args()
