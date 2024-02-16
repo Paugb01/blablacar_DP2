@@ -32,11 +32,11 @@ def insert_passenger_to_bigquery(passenger, project_id, dataset_name, table_name
     # Inserta la entrada en BQ
     errors = client.insert_rows_json(table_id, row_to_insert)
     if errors == []:
-        logging.info(f"Driver insertado en BQ: {passenger['passenger_id']}")
+        logging.info(f"Pasajero insertado en BQ: {passenger['passenger_id']}")
     else:
         logging.error(f"Error insertando en BQ: {errors}")
-# Define functions to parse the KMLs and generate data (courses, drivers, passengers)
 
+# Define functions to parse the KMLs and generate data (courses, drivers, passengers)
 def course_points(kml_file):  # This function parses the KML file and returns a DF with the course.
     # Specify the path to your KML file
     kml_file_path = kml_file
@@ -66,6 +66,7 @@ def course_points(kml_file):  # This function parses the KML file and returns a 
     course = tuple(zip(course_df['Longitude'], course_df['Latitude']))
     return course
 
+# Función para crear el pasajero (payload)
 def create_passenger():
     passenger = {}
     passenger['passenger_id'] = ''.join(
@@ -75,37 +76,36 @@ def create_passenger():
     passenger['ride_offer']= round(float(), 2)
     return passenger
 
-
-def gen_passenger(n_passengers, coordinate):
+# Función para generar el pasajero
+def gen_passenger(n_passengers, coordinate, course):
     # Generate passenger
-    passenger_list = []
+    passengers_list = []
     for passenger in range(n_passengers):
-        passenger_list.append(create_passenger())
-        passenger_list[passenger]['location'] = coordinate
-        passenger_list[passenger]['ride_offer'] = random.uniform(1, 3)
+        passengers_list.append(create_passenger())
+        passengers_list[passenger]['location'] = coordinate
+        passengers_list[passenger]['dropoff_location'] = course[-1]
+        passengers_list[passenger]['ride_offer'] = round((random.uniform(1, 3)), 2)
 
     # Passengers
-    duration = 200 
+    duration = 900 
     try:
         # Use PubSubMessages as a context manager
         pubsub_class = PubSubMessages(args.project_id, args.topic_passenger_name)
         start_time = time.time()
         while time.time() - start_time < duration:  
             # Publish passenger messages
-            for passenger in passenger_list:            
+            for passenger in passengers_list:            
                 insert_passenger_to_bigquery(passenger, 'involuted-river-411314', 'dp2', 'passengers')
-                print("Publishing passenger message:", passenger['passenger_id']) # For debugging
+                print("Publicando mensaje de pasajero:", passenger['passenger_id']) # For debugging
                 pubsub_class.publish_messages_passenger(passenger)
-                print("Passenger message published:", passenger['passenger_id'], passenger['location']) # For debugging
+                print("Mensaje de pasajero publicado:", passenger['passenger_id'], passenger['location']) # For debugging
+                time.sleep(random.uniform(1, 8))
             PubSubMessages(args.project_id, args.topic_passenger_name)
             # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
 
-
-
-
-
+# Función para escoger un KML aleatorio
 def archivo_aleatorio(directorio):
 
     archivos = os.listdir(directorio)# Obtener la lista de archivos en el directorio
@@ -118,39 +118,21 @@ def archivo_aleatorio(directorio):
         contenido = archivo.read()
     return ruta_archivo, contenido
 
-def obtener_punto_aleatorio_desde_kml(contenido_kml):
-    # Parsear el contenido KML
-    root = ET.fromstring(contenido_kml)
+# Función para elegir un punto aleatorio en la ruta para el pasajero
+def obtener_punto_aleatorio_desde_course(course_points):
+    punto_aleatorio= random.choice(course_points)
+    return punto_aleatorio
 
-    # Encontrar el elemento que contiene las coordenadas
-    coordinates_element = root.find(".//{http://www.opengis.net/kml/2.2}coordinates")
-
-    if coordinates_element is not None:
-        # Obtener las coordenadas como una cadena
-        coordenadas = coordinates_element.text.strip()
-
-        # Dividir las coordenadas en una lista de puntos
-        lista_puntos = coordenadas.split()
-
-        # Elegir un punto aleatorio de la lista
-        punto_aleatorio= random.choice(lista_puntos)
-         # Convertir el punto aleatorio en una tupla
-        punto_aleatorio_tupla = tuple(map(float, punto_aleatorio.split(',')))
-
-        return punto_aleatorio_tupla
-
-    else:
-        return None
-
+# Función para montar el pasajero a partir de la ruta
 def run_gen_passengers():
     while True:
-       directorio_principal = '../Rutas'
+       directorio_principal = '../Rutas/test'
        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
-       punto=obtener_punto_aleatorio_desde_kml(contenido_archivo)
-       gen_passenger(1, punto)
+       course = course_points(ruta_archivo)
+       punto=obtener_punto_aleatorio_desde_course(course)
+       gen_passenger(1, punto, course)
 
-
-
+# Definimos la clase PubSubMessages
 class PubSubMessages:
     """ Publish Messages in our PubSub Topic """
 
@@ -163,7 +145,7 @@ class PubSubMessages:
     def publish_messages_passenger(self, message: str):
         json_str = json.dumps(message)
         self.publisher.publish(self.topic_passenger_path, json_str.encode("utf-8"))
-        logging.info("A new passenger has been monitored. Id: %s", message['passenger_id'])
+        logging.info("Nuevo pasajero Id: %s", message['passenger_id'])
 
     def close(self):
         self.publisher.transport.close()
@@ -175,6 +157,7 @@ class PubSubMessages:
     def __exit__(self):
         self.close()
 
+# Main
 if __name__ == "__main__":
     # Main code
         logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -187,7 +170,7 @@ if __name__ == "__main__":
 
         threads = []
 
-        for _ in range(15):  
+        for _ in range(10):  # Aquí el no. de instancias simultáneas
             thread = threading.Thread(target=run_gen_passengers)
             thread.start()
             threads.append(thread)
