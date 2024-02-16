@@ -131,6 +131,9 @@ class PubSubMessages:
         logging.info(f"Vehículo monitoreado. Id: {message['plate_id']}")
 
 if __name__ == "__main__":
+
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
     parser = argparse.ArgumentParser(description='Generador de Datos de Vehículos')
     parser.add_argument('--project_id', required=True, help='Nombre del proyecto de GCP.')
     parser.add_argument('--topic_driver_name', required=True, help='Nombre del topic de PubSub para conductores.')
@@ -145,7 +148,7 @@ if __name__ == "__main__":
 
     # Threading para mantener n drivers en ruta
     threads = []
-    for _ in range(20):  # Aquí ponemos los drivers que queramos
+    for _ in range(5):  # Aquí ponemos los drivers que queramos
         thread = threading.Thread(target=run_gen_drivers, args=(args.project_id, args.topic_driver_name))
         thread.start()
         threads.append(thread)
