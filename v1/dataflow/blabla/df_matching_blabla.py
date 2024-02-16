@@ -21,7 +21,7 @@ class ParseAndRepublishMessageFn(beam.DoFn):
     """Parsea mensajes de PubSub y los re-publica inmediatamente"""
     def process(self, element):
         message = element.decode('utf-8')
-        logging.info(f"Received message: {message}")
+        logging.info(f"Mensaje recibido: {message}")
         try:
             msg = json.loads(message)
             # Re-publicar el mensaje inmediatamente para visualización
@@ -29,7 +29,7 @@ class ParseAndRepublishMessageFn(beam.DoFn):
             if 'plate_id' in msg or 'passenger_id' in msg:  # Mensaje de conductor o pasajero
                 yield msg
         except Exception as e:
-            logging.error(f"Failed to parse and republish message: {e}")
+            logging.error(f"Error parseando y re-publicando mensaje: {e}")
 
 class MatchMessagesFn(beam.DoFn):
     """Matchea drivers y passengers con una tolerancia a la posición y compatibilidad de oferta de viaje."""
@@ -45,10 +45,9 @@ class MatchMessagesFn(beam.DoFn):
         return c * r
 
     def ride_offer_within_range(self, driver_offer, passenger_offer):
-        """Verifica si las ofertas de viaje están dentro del ±25% de diferencia."""
-        lower_bound = passenger_offer * 0.75
-        upper_bound = passenger_offer * 1.25
-        return lower_bound <= driver_offer <= upper_bound
+        """Verifica si las ofertas del passenger es al menos un 75% de la oferta del driver"""
+        lower_bound = driver_offer * 0.75
+        return passenger_offer >= lower_bound
 
     def process(self, element, window=beam.DoFn.WindowParam):
         _, messages = element

@@ -26,3 +26,9 @@
         -   1.⁠ ⁠Adquiere mensajes de pubsub de driver y passenger y lo primero lo re-envia a otro topic para streamlit.
         -   2.⁠ ⁠⁠Los mensajes que recibe, los procesa y si hay match, crea un mensaje con trip_id, passenger_id, driver_id, pickup_location, dropoff_location y cost. Creé una tabla con travelled_distance, a ver si se nos ocurre como pasar puntos a km. Otra estrategia sería matchear por location Y precio, de viaje, esto se puede discutir.
         -   3.⁠ ⁠⁠Manda el mensaje de match a bigquery (osea, escribe en la tabla).
+-    15/02/2023:
+    -   jumepe: [MODIFIED] df_matching.py --> df_matching_blabla/taxi.py:
+        -   1.⁠ Dos scripts DF para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
+-     16/02/2023:
+    -   jumepe: [MODIFIED] data_gen_driver_mvp.py --> data_gen_driver_blabla/taxi_v1.py:
+        -   1.⁠ Dos scripts de generación de driver para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
