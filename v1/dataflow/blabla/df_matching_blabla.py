@@ -138,7 +138,7 @@ def run():
 
         messages_by_bin | 'Escribir a BigQuery' >> WriteToBigQuery(
             'involuted-river-411314:dp2.trips',
-            schema='trip_id:STRING, bin_key:STRING, driver_id:STRING, passenger_id:STRING, pickup_location:GEOGRAPHY, dropoff_location:GEOGRAPHY, travelled_distance: FLOAT, status:STRING, cost:FLOAT, company_margin:FLOAT, ride_offer:FLOAT',
+            schema='trip_id:STRING, bin_key:STRING, driver_id:STRING, passenger_id:STRING, pickup_location:GEOGRAPHY, dropoff_location:GEOGRAPHY, travelled_distance: FLOAT, status:STRING, cost:FLOAT, company_margin:FLOAT, accepted_offer:FLOAT',
             create_disposition=BigQueryDisposition.CREATE_IF_NEEDED,
             write_disposition=BigQueryDisposition.WRITE_APPEND
         )
