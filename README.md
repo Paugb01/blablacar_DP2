@@ -31,6 +31,9 @@
         -   1. Dos scripts de generación de driver para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
         -   2. data_gen_driver/passenger_blabla modificados, ahora el threading funciona de forma que mantiene n instancias siempre corriendo, cuando una ruta/pasajero acaba, levanta otra.
 -     17/02/2023:
-    -   jumepe: [MODIFIED] data_gen_driver_blabla.py:
-        -   1. Cambio de estrategia de matcheo de GroupByKey a Binning por distancia + GroupByKey por bins.
-            -   De esta forma, el binning actúa como filtro de matcheo por location y luego ya matchea por precio.
+    -   jumepe: [MODIFIED] df_matching_blabla.py:
+        -   1.  Cambio de estrategia de matcheo de GroupByKey a Binning por distancia + GroupByKey por bins.
+                -   De esta forma, el binning actúa como filtro de matcheo por location y luego ya matchea por precio.
+        -   2.  Incluido el cálculo del margen industrial: fijo de 0.50€ + 10% de ride_offer si supera los 2.50€
+        -   3.  Coste: ride_offer + margen industrial + IVA (21%)
+        -   4.  Añadido bin_key a matched_messages para poder agrupar mejor en BigQuery
