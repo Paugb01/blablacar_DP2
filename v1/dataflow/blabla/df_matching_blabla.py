@@ -62,25 +62,45 @@ class MatchMessagesFn(beam.DoFn):
         return passenger_offer >= driver_offer * 0.75
 
     def process(self, element):
-        _, messages = element
+        bin_key, messages = element
         drivers = [msg for msg in messages if 'plate_id' in msg]
         passengers = [msg for msg in messages if 'passenger_id' in msg]
         for driver in drivers:
             for passenger in passengers:
                 if self.ride_offer_within_range(driver['ride_offer'], passenger['ride_offer']):
                     travelled_distance = self.haversine(driver['location'][1], driver['location'][0], passenger['dropoff_location'][1], passenger['dropoff_location'][0])
-                    match_message = {
-                        'trip_id': str(uuid.uuid4()),
-                        'driver_id': driver['plate_id'],
-                        'passenger_id': passenger['passenger_id'],
-                        'pickup_location': f"POINT({passenger['location'][1]} {passenger['location'][0]})",
-                        'dropoff_location': f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})",
-                        'status': 'matched',
-                        'cost': passenger['ride_offer'],
-                        'travelled_distance': round(travelled_distance, 2)
-                    }
-                    logging.info(f"Emparejamiento encontrado: Conductor {driver['plate_id']} y pasajero {passenger['passenger_id']} - Precio: €{match_message['cost']}")
-                    yield match_message
+                    if passenger['ride_offer'] > 2.50:
+                        match_message = {
+                            'trip_id': str(uuid.uuid4()),
+                            'bin_key': f"{bin_key[0]}_{bin_key[1]}",  # Incluimos el bin key para poder agrupar en BQ cuando hay múltiples match para el mismo par driver-passenger
+                            'driver_id': driver['plate_id'],
+                            'passenger_id': passenger['passenger_id'],
+                            'pickup_location': f"POINT({passenger['location'][1]} {passenger['location'][0]})",
+                            'dropoff_location': f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})",
+                            'status': 'matched',
+                            'cost': round((((passenger['ride_offer'] * 1.10) +  0.50) * 1.21), 2), # Precio total con IVA (21%) y margen industrial (Fijo + 10% ride_offer)
+                            'company_margin': round(((passenger['ride_offer'] * 0.10) +  0.50), 2), # Fijo de 0.50€ más un 10% de la oferta si supera 2.50€
+                            'accepted_offer': passenger['ride_offer'],
+                            'travelled_distance': round(travelled_distance, 2)
+                        }
+                        logging.info(f"Emparejamiento encontrado: Conductor {driver['plate_id']} y pasajero {passenger['passenger_id']} - Precio: €{match_message['cost']} (gastos e IVA incluidos)")
+                        yield match_message
+                    else:
+                        match_message = {
+                            'trip_id': str(uuid.uuid4()),
+                            'bin_key': f"{bin_key[0]}_{bin_key[1]}",  # Incluimos el bin key para poder agrupar en BQ cuando hay múltiples match para el mismo par driver-passenger
+                            'driver_id': driver['plate_id'],
+                            'passenger_id': passenger['passenger_id'],
+                            'pickup_location': f"POINT({passenger['location'][1]} {passenger['location'][0]})",
+                            'dropoff_location': f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})",
+                            'status': 'matched',
+                            'company_margin': 0.50, # Fijo de 0.50€
+                            'cost': round(((passenger['ride_offer'] +  0.50) * 1.21), 2), # Precio total con IVA (21%) y margen industrial (Fijo)
+                            'accepted_offer': passenger['ride_offer'],
+                            'travelled_distance': round(travelled_distance, 2)
+                        }
+                        logging.info(f"Emparejamiento encontrado: Conductor {driver['plate_id']} y pasajero {passenger['passenger_id']} - Precio: €{match_message['cost']} (gastos e IVA incluidos)")
+                        yield match_message
 
 def run():
     parser = argparse.ArgumentParser(description='Pipeline de Dataflow para procesar y emparejar ubicaciones.')
@@ -118,7 +138,7 @@ def run():
 
         messages_by_bin | 'Escribir a BigQuery' >> WriteToBigQuery(
             'involuted-river-411314:dp2.trips',
-            schema='trip_id:STRING, driver_id:STRING, passenger_id:STRING, pickup_location:GEOGRAPHY, dropoff_location:GEOGRAPHY, travelled_distance: FLOAT, status:STRING, cost:FLOAT',
+            schema='trip_id:STRING, bin_key:STRING, driver_id:STRING, passenger_id:STRING, pickup_location:GEOGRAPHY, dropoff_location:GEOGRAPHY, travelled_distance: FLOAT, status:STRING, cost:FLOAT, company_margin:FLOAT, accepted_offer:FLOAT',
             create_disposition=BigQueryDisposition.CREATE_IF_NEEDED,
             write_disposition=BigQueryDisposition.WRITE_APPEND
         )
