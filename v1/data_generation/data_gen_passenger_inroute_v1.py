@@ -85,6 +85,7 @@ def gen_passenger(n_passengers, coordinate, course):
         passengers_list[passenger]['location'] = coordinate
         passengers_list[passenger]['dropoff_location'] = course[-1]
         passengers_list[passenger]['ride_offer'] = round((random.uniform(1, 3)), 2)
+        insert_passenger_to_bigquery(passengers_list[passenger], 'involuted-river-411314', 'dp2', 'passengers')
 
     # Passengers
     duration = 900 
@@ -95,13 +96,12 @@ def gen_passenger(n_passengers, coordinate, course):
         while time.time() - start_time < duration:  
             # Publish passenger messages
             for passenger in passengers_list:            
-                insert_passenger_to_bigquery(passenger, 'involuted-river-411314', 'dp2', 'passengers')
                 print("Publicando mensaje de pasajero:", passenger['passenger_id']) # For debugging
                 pubsub_class.publish_messages_passenger(passenger)
                 print("Mensaje de pasajero publicado:", passenger['passenger_id'], passenger['location']) # For debugging
                 time.sleep(random.uniform(1, 8))
             PubSubMessages(args.project_id, args.topic_passenger_name)
-            # For some reason I couldn't find if we don't initialise pubsub_class after the for loop, the last message is undelivered...
+            # Por alguna razón, si no se re-inicializa la instancia PubSubMessages, no envía el último mensaje....
     except Exception as err:
         logging.error("Error while inserting data into the PubSub Topic: %s", err)
 
@@ -126,7 +126,7 @@ def obtener_punto_aleatorio_desde_course(course_points):
 # Función para montar el pasajero a partir de la ruta
 def run_gen_passengers():
     while True:
-       directorio_principal = '../Rutas/test'
+       directorio_principal = '../Rutas'
        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
        course = course_points(ruta_archivo)
        punto=obtener_punto_aleatorio_desde_course(course)
@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
         threads = []
 
-        for _ in range(10):  # Aquí el no. de instancias simultáneas
+        for _ in range(5):  # Aquí el no. de instancias simultáneas
             thread = threading.Thread(target=run_gen_passengers)
             thread.start()
             threads.append(thread)
