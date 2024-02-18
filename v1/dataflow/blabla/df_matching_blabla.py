@@ -75,7 +75,7 @@ class MatchMessagesFn(beam.DoFn):
                             'bin_key': f"{bin_key[0]}_{bin_key[1]}",  # Incluimos el bin key para poder agrupar en BQ cuando hay múltiples match para el mismo par driver-passenger
                             'driver_id': driver['plate_id'],
                             'passenger_id': passenger['passenger_id'],
-                            'pickup_location': f"POINT({passenger['location'][1]} {passenger['location'][0]})",
+                            'pickup_location': f"POINT({driver['location'][1]} {driver['location'][0]})",
                             'dropoff_location': f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})",
                             'status': 'matched',
                             'cost': round((((passenger['ride_offer'] * 1.10) +  0.50) * 1.21), 2), # Precio total con IVA (21%) y margen industrial (Fijo + 10% ride_offer)
@@ -91,7 +91,7 @@ class MatchMessagesFn(beam.DoFn):
                             'bin_key': f"{bin_key[0]}_{bin_key[1]}",  # Incluimos el bin key para poder agrupar en BQ cuando hay múltiples match para el mismo par driver-passenger
                             'driver_id': driver['plate_id'],
                             'passenger_id': passenger['passenger_id'],
-                            'pickup_location': f"POINT({passenger['location'][1]} {passenger['location'][0]})",
+                            'pickup_location': f"POINT({driver['location'][1]} {driver['location'][0]})",
                             'dropoff_location': f"POINT({passenger['dropoff_location'][1]} {passenger['dropoff_location'][0]})",
                             'status': 'matched',
                             'company_margin': 0.50, # Fijo de 0.50€
