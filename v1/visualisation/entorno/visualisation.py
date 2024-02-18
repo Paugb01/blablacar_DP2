@@ -7,12 +7,12 @@ import folium
 from folium.plugins import FloatImage
 from google.oauth2 import service_account
 from google.cloud import bigquery
+import plotly.express as plx
 import re
 
 
 # Streamlit visualisation: set the trip you want to check. 
-plate_id = '1889AFJ'
-
+trip_id = 'f8871f35-057f-4b07-b5d6-efaba2161b24'
 
 @st.cache_data(ttl=600)
 
@@ -27,13 +27,28 @@ def run_query(query):
 
 # Main Streamlit application
 def main():
-    st.title("BlaBlaCar City App")
+    st.title(":blue[BlaBlaCar] City App")
+
+    passenger = run_query(f'''SELECT location
+                              FROM involuted-river-411314.dp2.passengers
+                              WHERE passenger_id = (SELECT passenger_id
+                              FROM `involuted-river-411314.dp2.trips`
+                              WHERE trip_id = "{trip_id}"
+                              LIMIT 1)''')
+    latitude_p = passenger[0]['location']['longitude']
+    longitude_p = passenger[0]['location']['latitude']
+
+    st.header('User view demonstration :speaking_head_in_silhouette:', divider='violet')
+    st.header(f'Your driver is waiting for you :sunglasses: :car:')
 
     loc = run_query(f'''SELECT driver_id, pickup_location, dropoff_location 
                         FROM `involuted-river-411314.dp2.trips`
-                        WHERE driver_id = "{plate_id}"
+                        WHERE trip_id = "{trip_id}"
                         LIMIT 1''')
-
+    cost = run_query(f'''SELECT cost, travelled_distance
+                        FROM `involuted-river-411314.dp2.trips`
+                        WHERE trip_id = "{trip_id}"
+                        LIMIT 1''')
     point_strs = []
     pickup = loc[0]['pickup_location']
     dropoff = loc[0]['dropoff_location']
@@ -68,37 +83,47 @@ def main():
     folium.Marker([converted_points.iloc[0]['lat'], converted_points.iloc[0]['lon']], 
         icon=folium.CustomIcon('./images/Black.webp', icon_size=(100, 100))).add_to(m)
     
-    # Destination marker
+    # Destination point
     folium.Marker([converted_points.iloc[1]['lat'], converted_points.iloc[1]['lon']]).add_to(m)
 
+    # Passenger location
+    folium.Marker([latitude_p, longitude_p], 
+        icon=folium.CustomIcon('./images/person.png', icon_size=(70, 70))).add_to(m)
+    
     folium_static(m)
 
+    st.header(f"Your destination is {cost[0]['travelled_distance']} kms away for a price of :blue[{cost[0]['cost']}€] :racing_car: :100:")
 
     # CRM Details and KPIs
+    st.header('Business Platform :bar_chart:', divider='blue')
 
-    cost = run_query('''SELECT driver_id, pickup_location, dropoff_location 
-                        FROM `involuted-river-411314.dp2.trips`
-                        WHERE driver_id = "5254KII"
-                        LIMIT 1''')
+    drivers = run_query(f'''SELECT COUNT(DISTINCT plate_id)
+                        FROM `involuted-river-411314.dp2.drivers`''')
+    
+    total_volume_traded = run_query(f'''SELECT SUM(cost)
+                        FROM `involuted-river-411314.dp2.trips`''')
+    
+    avg_income = run_query(f'''SELECT company_margin
+                                    FROM `involuted-river-411314.dp2.trips`
+                                    WHERE company_margin IS NOT NULL''')
+    
+    total_income = run_query(f'''SELECT SUM(company_margin)
+                                    FROM `involuted-river-411314.dp2.trips`
+                                    WHERE company_margin IS NOT NULL''')
+    
+    inc = float(total_income[0]['f0_'])
+    tvt = round(total_volume_traded[0]['f0_'],2)
 
-    point_strs = []
-    pickup = loc[0]['pickup_location']
-    dropoff = loc[0]['dropoff_location']
-    point_strs.append(pickup)
-    point_strs.append(dropoff)
-    converted_points = []
+    st.subheader(f"Up to date, there are {drivers[0]['f0_']} drivers enrolled to the platform.")
+    st.subheader(f"A total of {tvt}€ have been saved by drivers thanks to our platform.")
 
 
+    chart_data = pd.DataFrame({'Total income': [inc],
+                               'Total volume traded': [tvt]}, columns=['Total income', 'Total volume traded'])
 
-
+    st.bar_chart(chart_data)
 # Create API client.
 client = bigquery.Client()
-
-# Perform query.
-# Uses st.cache_data to only rerun when the query changes or after 10 min.
-
-
-
 
 if __name__ == "__main__":
     main()
