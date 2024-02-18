@@ -93,11 +93,12 @@ def gen_drivers(n_drivers, course, project_id, topic_driver_name):
 
 # Función para montar el conductor a partir de la ruta
 def run_gen_drivers(project_id, topic_driver_name):
-    directorio_principal = '../Rutas'
-    ruta_archivo = archivo_aleatorio(directorio_principal)
-    logging.info(f"Procesando archivo KML: {ruta_archivo}")
-    course = course_points(ruta_archivo)
-    gen_drivers(1, course, project_id, topic_driver_name)
+    while True:
+        directorio_principal = '../Rutas'
+        ruta_archivo = archivo_aleatorio(directorio_principal)
+        logging.info(f"Procesando archivo KML: {ruta_archivo}")
+        course = course_points(ruta_archivo)
+        gen_drivers(1, course, project_id, topic_driver_name)
 
 # Definimos clase de PubSubMessages
 class PubSubMessages:
@@ -121,7 +122,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     threads = []
-    for _ in range(1): # Aquí el no. de instancias simultáneas
+    for _ in range(8): # Aquí el no. de instancias simultáneas
         thread = threading.Thread(target=run_gen_drivers, args=(args.project_id, args.topic_driver_name))
         thread.start()
         threads.append(thread)
