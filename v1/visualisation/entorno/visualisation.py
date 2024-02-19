@@ -7,12 +7,12 @@ import folium
 from folium.plugins import FloatImage
 from google.oauth2 import service_account
 from google.cloud import bigquery
-import plotly.express as plx
+import plotly.express as px
 import re
 
 
 # Streamlit visualisation: set the trip you want to check. 
-trip_id = 'f8871f35-057f-4b07-b5d6-efaba2161b24'
+trip_id = '35afebae-15f4-4110-a3cc-249b37321b30'
 
 @st.cache_data(ttl=600)
 
@@ -22,7 +22,6 @@ def run_query(query):
     # Convert to list of dicts. Required for st.cache_data to hash the return value.
     rows = [dict(row) for row in rows_raw]
     return rows
-
 
 
 # Main Streamlit application
@@ -35,6 +34,7 @@ def main():
                               FROM `involuted-river-411314.dp2.trips`
                               WHERE trip_id = "{trip_id}"
                               LIMIT 1)''')
+    print(passenger)
     latitude_p = passenger[0]['location']['longitude']
     longitude_p = passenger[0]['location']['latitude']
 
@@ -111,9 +111,20 @@ def main():
                                     FROM `involuted-river-411314.dp2.trips`
                                     WHERE company_margin IS NOT NULL''')
     
+    total_drivers_with_match = run_query(f'''SELECT COUNT(DISTINCT driver_id)
+                                    FROM `involuted-river-411314.dp2.trips`
+                                    WHERE travelled_distance <> 0.0''')
+    
+
+    
+    match_ratio = round(float(total_drivers_with_match[0]['f0_'])/float(drivers[0]['f0_']),2)
+    
+
+
+
     inc = float(total_income[0]['f0_'])
     tvt = round(total_volume_traded[0]['f0_'],2)
-
+ 
     st.subheader(f"Up to date, there are {drivers[0]['f0_']} drivers enrolled to the platform.")
     st.subheader(f"A total of {tvt}€ have been saved by drivers thanks to our platform.")
 
@@ -122,6 +133,17 @@ def main():
                                'Total volume traded': [tvt]}, columns=['Total income', 'Total volume traded'])
 
     st.bar_chart(chart_data)
+
+    st.header(f'Around {match_ratio*100}% of our drivers has found a match! :heart: :fire:')
+
+
+    df = {'drivers with no match': drivers[0]['f0_']-total_drivers_with_match[0]['f0_'],
+        'drivers with match': total_drivers_with_match[0]['f0_']}
+
+    fig = px.pie(values=list(df.values()), names=list(df.keys()), title='Drivers Matching Status')
+    st.plotly_chart(fig)
+
+
 # Create API client.
 client = bigquery.Client()
 
