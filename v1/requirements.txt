@@ -9,3 +9,4 @@ pandas
 streamlit
 folium
 streamlit-folium
+plotly
