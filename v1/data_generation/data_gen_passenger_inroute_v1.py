@@ -126,7 +126,7 @@ def obtener_punto_aleatorio_desde_course(course_points):
 # Función para montar el pasajero a partir de la ruta
 def run_gen_passengers():
     while True:
-       directorio_principal = '../Rutas'
+       directorio_principal = '../Rutas/test'
        ruta_archivo, contenido_archivo = archivo_aleatorio(directorio_principal)
        course = course_points(ruta_archivo)
        punto=obtener_punto_aleatorio_desde_course(course)
@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
         threads = []
 
-        for _ in range(5):  # Aquí el no. de instancias simultáneas
+        for _ in range(40):  # Aquí el no. de instancias simultáneas
             thread = threading.Thread(target=run_gen_passengers)
             thread.start()
             threads.append(thread)
