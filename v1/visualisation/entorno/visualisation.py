@@ -117,7 +117,7 @@ def main():
     
 
     
-    match_ratio = round(float(total_drivers_with_match[0]['f0_'])/360,2)
+    match_ratio = round(float(total_drivers_with_match[0]['f0_'])/float(drivers[0]['f0_']),2)
     
 
 
@@ -137,8 +137,8 @@ def main():
     st.header(f'Around {match_ratio*100}% of our drivers has found a match! :heart: :fire:')
 
 
-    df = {'drivers with no match': 293,
-        'drivers with match': 67}
+    df = {'drivers with no match': drivers[0]['f0_']-total_drivers_with_match[0]['f0_'],
+        'drivers with match': total_drivers_with_match[0]['f0_']}
 
     fig = px.pie(values=list(df.values()), names=list(df.keys()), title='Drivers Matching Status')
     st.plotly_chart(fig)
