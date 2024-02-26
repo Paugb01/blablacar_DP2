@@ -9,18 +9,15 @@
 -   3/02/2024:
     -   pagaba [ADDED] mvp/visualisation:
 	-   Contains a venv, producer which sends kafka messages to test streamlit live map visualisation. Consumer.py receives this messages and plots them in a stramlit app which reruns with each incoming message. docker-compose.yml runs the necessary services to use this solution. Eventually, we need to connect this to pub/sub, and a better way of plotting the map markers. 
-<<<<<<< HEAD
     -
 -    01/02/2024:
 -       dipifa [ADDED]
 -       GCP, creación de un PUB/SUB que lee los datos de un generador, utiliza DATAFLOW y se pueden hacer
 -       consulstas en BIG QUERY       
-=======
 -   02/02/2024:
     -   jumepe [ADDED] data_gen_driver_mvp/data_gen_passenger.py:
         -   Added data_gen_driver_mvp/data_gen_passenger.py scripts. Original script has been split in two, which can be handled separately. Driver script generates a motion with random.uniform, looping through the course points and passing the values to its location key. It passes the payload with the updated location to PubSub each loop.
         -   Passenger code generates the passenger payload with a location chosen randomly from the course.
->>>>>>> main
 -   11/02/2023:
     -   jumepe: [MODIFIED] df_matching.py:
         -   1.⁠ ⁠Adquiere mensajes de pubsub de driver y passenger y lo primero lo re-envia a otro topic para streamlit.
@@ -31,4 +28,12 @@
         -   1.⁠ Dos scripts DF para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
 -     16/02/2023:
     -   jumepe: [MODIFIED] data_gen_driver_mvp.py --> data_gen_driver_blabla/taxi_v1.py:
-        -   1.⁠ Dos scripts de generación de driver para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
+        -   1. Dos scripts de generación de driver para tipo blablacar (matcheo por localización Y precio), y para taxi (matcheo solo por localización).
+        -   2. data_gen_driver/passenger_blabla modificados, ahora el threading funciona de forma que mantiene n instancias siempre corriendo, cuando una ruta/pasajero acaba, levanta otra.
+-     17/02/2023:
+    -   jumepe: [MODIFIED] df_matching_blabla.py:
+        -   1.  Cambio de estrategia de matcheo de GroupByKey a Binning por distancia + GroupByKey por bins.
+                -   De esta forma, el binning actúa como filtro de matcheo por location y luego ya matchea por precio.
+        -   2.  Incluido el cálculo del margen industrial: fijo de 0.50€ + 10% de ride_offer si supera los 2.50€
+        -   3.  Coste: ride_offer + margen industrial + IVA (21%)
+        -   4.  Añadido bin_key a matched_messages para poder agrupar mejor en BigQuery
